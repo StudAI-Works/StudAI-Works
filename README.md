@@ -1,4 +1,4 @@
-## 🏗️ Project Structure & Tech Stack
+## Project Structure & Tech Stack
 
 ### 🖥️ Frontend
 - **Framework:** React.js
