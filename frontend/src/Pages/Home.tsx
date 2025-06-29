@@ -24,7 +24,7 @@ function Home() {
   return (
     <div className='text-3xl relative w-screen min-h-screen overflow-y-auto'>
       <ToastContainer/>
-      <p className='text-lg'>Home part goes here</p>
+      <p className='text-lg'> Home part </p>
 
       <div></div>
 
