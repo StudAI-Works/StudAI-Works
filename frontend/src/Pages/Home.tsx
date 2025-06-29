@@ -7,7 +7,7 @@ function Home() {
   const BASE_URL: string = "http://localhost:8080"
   const userPromt = useRef<HTMLTextAreaElement | null>(null)
   const HandlePromt = () => {
-    console.log("clicked")
+    // console.log("clicked")
     if (userPromt?.current?.value) {
       axios.post(`${BASE_URL}/userpromt`, { Promt: userPromt.current.value })
         .then(res => {
