@@ -1,3 +1,8 @@
+### Clone respository
+```
+git clone https://github.com/StudAI-Works/StudAI-Works
+```
+
 ### To Start Frontend
 ```bash
 cd frontend
