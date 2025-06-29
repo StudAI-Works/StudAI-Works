@@ -1,3 +1,13 @@
+### To Start Frontend
+```bash
+cd frontend
+npm run dev
+```
+### To Start Backend
+```bash
+cd backend
+npm run dev
+```
 ## Project Structure & Tech Stack
 
 ### 🖥️ Frontend
