@@ -27,9 +27,9 @@ function Home() {
 
       <div></div>
 
-      <div className='w-[50%]  absolute bottom-0 transition-all    flex items-center justify-evenly pl-10  h-20 '>
-        <textarea className='border border-gray-100 placeholder:text-sm left-4 w-[46%] absolute top-5 focus:bg-gray-100 rounded-2xl focus:outline-0 pt-3  bottom-10   placeholder:top-2 md:placeholder:top-3 min-h-11 text-sm pl-4 placeholder:absolute lg:placeholder:top-3 xl:placeholder:top-3' placeholder='Enter your promt here' ref={userPromt} />
-        <button className='border border-gray-200 mt-1 rounded-3xl  bottom-10 hover:bg-gray-200 transition-all duration-100 right-0 p-1 ml-2 active:scale-125'><IoIosArrowRoundUp className='font-light' onClick={HandlePromt} /></button>
+      <div className='w-[50%]  absolute bottom-0 transition-all bg-gray-100 rounded-2xl flex items-center justify-evenly pl-10  h-20 '>
+        <textarea className='border border-gray-100 placeholder:text-sm left-4 w-[76%] absolute top-5 focus:bg-gray-200 rounded-2xl focus:outline-0 pt-3  bottom-10   placeholder:top-2 md:placeholder:top-3 min-h-11 text-sm pl-4 placeholder:absolute lg:placeholder:top-3 xl:placeholder:top-3' placeholder='Enter your promt here' ref={userPromt} />
+        <button className='border border-gray-300 mt-1 rounded-3xl  bottom-10 hover:bg-gray-200 transition-all duration-100  top-5 right-3 h-fit p-1 ml-2 active:scale-12 absolute'><IoIosArrowRoundUp className='font-light' onClick={HandlePromt} /></button>
       </div>
     </div>
   )
