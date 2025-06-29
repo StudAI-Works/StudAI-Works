@@ -7,6 +7,7 @@ function Home() {
   const BASE_URL: string = "http://localhost:8080"
   const userPromt = useRef<HTMLTextAreaElement | null>(null)
   const HandlePromt = () => {
+    console.log("clicked")
     if (userPromt?.current?.value) {
       axios.post(`${BASE_URL}/userpromt`, { Promt: userPromt.current.value })
         .then(res => {
@@ -28,8 +29,9 @@ function Home() {
       <div></div>
 
       <div className='w-[50%]  absolute bottom-0 transition-all bg-gray-100 rounded-2xl flex items-center justify-evenly pl-10  h-20 '>
-        <textarea className='border border-gray-100 placeholder:text-sm left-4 w-[76%] absolute top-5 focus:bg-gray-200 rounded-2xl focus:outline-0 pt-3  bottom-10   placeholder:top-2 md:placeholder:top-3 min-h-11 text-sm pl-4 placeholder:absolute lg:placeholder:top-3 xl:placeholder:top-3' placeholder='Enter your promt here' ref={userPromt} />
-        <button className='border border-gray-300 mt-1 rounded-3xl  bottom-10 hover:bg-gray-200 transition-all duration-100  top-5 right-3 h-fit p-1 ml-2 active:scale-12 absolute'><IoIosArrowRoundUp className='font-light' onClick={HandlePromt} /></button>
+        <textarea className='border border-gray-100 placeholder:text-sm left-4 w-[76%] absolute top-5 focus:bg-gray-200 rounded-2xl focus:outline-0 pt-3  bottom-10   placeholder:top-2 md:placeholder:top-3 min-h-11 text-sm pl-4 placeholder:absolute lg:placeholder:top-3 xl:placeholder:top-3' placeholder='Enter your promt here z-10' ref={userPromt} />
+        <button className='z-10 absolute right-10 rounded-3xl border border-gray-300 p-1 hover:bg-gray-300 active:scale-110'><IoIosArrowRoundUp className='font-light' onClick={HandlePromt} /></button>
+
       </div>
     </div>
   )
