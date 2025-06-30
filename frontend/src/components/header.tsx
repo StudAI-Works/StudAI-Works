@@ -11,8 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Code, User, CreditCard, LogOut, Rocket, Database, Cloud } from "lucide-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { Link, useLocation } from "react-router-dom"
 
 interface HeaderProps {
   user?: {
@@ -23,14 +22,14 @@ interface HeaderProps {
 }
 
 export function Header({ user }: HeaderProps) {
-  const pathname = usePathname()
+  const location = useLocation()
+  const pathname = location.pathname
   const isAuthenticated = !!user
 
   return (
-    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-8">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2">
             <Code className="h-8 w-8 text-primary" />
             <span className="font-bold text-xl">Nexus Cloud Platform</span>
           </Link>
@@ -38,7 +37,7 @@ export function Header({ user }: HeaderProps) {
           {isAuthenticated && (
             <nav className="hidden md:flex items-center space-x-6">
               <Link
-                href="/generate"
+                to="/generate"
                 className={`text-sm font-medium transition-colors hover:text-primary ${
                   pathname === "/generate" ? "text-primary" : "text-muted-foreground"
                 }`}
@@ -46,7 +45,7 @@ export function Header({ user }: HeaderProps) {
                 Generate
               </Link>
               <Link
-                href="/dashboard"
+                to="/dashboard"
                 className={`text-sm font-medium transition-colors hover:text-primary ${
                   pathname === "/dashboard" ? "text-primary" : "text-muted-foreground"
                 }`}
@@ -54,7 +53,7 @@ export function Header({ user }: HeaderProps) {
                 Projects
               </Link>
               <Link
-                href="/organization"
+                to="/organization"
                 className={`text-sm font-medium transition-colors hover:text-primary ${
                   pathname === "/organization" ? "text-primary" : "text-muted-foreground"
                 }`}
@@ -153,7 +152,7 @@ export function Header({ user }: HeaderProps) {
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/account">
+                  <Link to="/account">
                     <User className="mr-2 h-4 w-4" />
                     Account
                   </Link>
@@ -171,16 +170,15 @@ export function Header({ user }: HeaderProps) {
             </DropdownMenu>
           ) : (
             <div className="flex items-center space-x-2">
-              <Link href="/auth">
+              <Link to="/auth">
                 <Button variant="ghost">Sign In</Button>
               </Link>
-              <Link href="/auth">
+              <Link to="/auth">
                 <Button>Get Started</Button>
               </Link>
             </div>
           )}
         </div>
       </div>
-    </header>
   )
 }

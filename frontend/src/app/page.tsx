@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Code, Users, Cloud, Star, Github, Twitter, Linkedin } from "lucide-react"
-import Link from "next/link"
+import {Link} from "react-router-dom"
 import { Header } from "@/components/header"
 
 export default function LandingPage() {
@@ -23,7 +23,7 @@ export default function LandingPage() {
             Build Projects at Lightning Speed with AI-powered development tools
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth">
+            <Link to="/auth">
               <Button size="lg" className="text-lg px-8 py-6">
                 Start Building <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -141,7 +141,7 @@ export default function LandingPage() {
           <p className="text-xl text-muted-foreground mb-8">
             Join thousands of developers who are building faster with Nexus Cloud Platform
           </p>
-          <Link href="/auth">
+          <Link to="/auth">
             <Button size="lg" className="text-lg px-8 py-6">
               Get Started Free <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
@@ -175,22 +175,22 @@ export default function LandingPage() {
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Features
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Pricing
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Documentation
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     API
                   </Link>
                 </li>
@@ -201,22 +201,22 @@ export default function LandingPage() {
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     About
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Blog
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Careers
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Contact
                   </Link>
                 </li>
@@ -227,22 +227,22 @@ export default function LandingPage() {
               <h4 className="font-semibold mb-4">Legal</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Privacy Policy
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Terms & Conditions
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     Security
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-foreground">
+                  <Link to="#" className="hover:text-foreground">
                     GDPR
                   </Link>
                 </li>

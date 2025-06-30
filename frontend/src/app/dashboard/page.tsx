@@ -1,15 +1,16 @@
-"use client"
+
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+// import { Badge } from "@/components/ui/badge"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder } from "lucide-react"
 import { Header } from "@/components/header"
 import { Sidebar } from "@/components/dashboard-sidebar"
-import Link from "next/link"
+import {Link} from "react-router-dom"
 
 const mockProjects = [
   {
@@ -103,7 +104,7 @@ export default function DashboardPage() {
                   className="pl-10"
                 />
               </div>
-              <Link href="/generate">
+              <Link to="/generate">
                 <Button className="w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Create New Project
@@ -172,7 +173,7 @@ export default function DashboardPage() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery ? "Try adjusting your search terms" : "Create your first project to get started"}
                 </p>
-                <Link href="/editor">
+                <Link to="/editor">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Create New Project

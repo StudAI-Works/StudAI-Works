@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Code, Mail, Eye, EyeOff } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import {Link} from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 
 export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const router = useNavigate()
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,7 +25,7 @@ export default function AuthPage() {
     // Simulate authentication
     setTimeout(() => {
       setIsLoading(false)
-      router.push("/dashboard")
+      router("/dashboard")
     }, 1500)
   }
 
@@ -34,7 +34,7 @@ export default function AuthPage() {
     // Simulate Google auth
     setTimeout(() => {
       setIsLoading(false)
-      router.push("/dashboard")
+      router("/dashboard")
     }, 1500)
   }
 
@@ -42,7 +42,7 @@ export default function AuthPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center mb-8">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2">
             <Code className="h-8 w-8 text-primary" />
             <span className="font-bold text-xl">Nexus Cloud Platform</span>
           </Link>
@@ -92,7 +92,7 @@ export default function AuthPage() {
                 </form>
 
                 <div className="text-center">
-                  <Link href="#" className="text-sm text-muted-foreground hover:text-primary">
+                  <Link to="#" className="text-sm text-muted-foreground hover:text-primary">
                     Forgot your password?
                   </Link>
                 </div>
@@ -158,11 +158,11 @@ export default function AuthPage() {
 
             <p className="text-xs text-center text-muted-foreground mt-6">
               By continuing, you agree to our{" "}
-              <Link href="#" className="underline hover:text-primary">
+              <Link to="#" className="underline hover:text-primary">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="#" className="underline hover:text-primary">
+              <Link to="#" className="underline hover:text-primary">
                 Privacy Policy
               </Link>
             </p>
