@@ -8,6 +8,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { ToastContainer, toast } from "react-toastify"
+// import ""
+import axios from "axios"
 import {
   Send,
   Sparkles,
@@ -114,6 +117,7 @@ export default function GeneratePage() {
     email: "john@example.com",
     avatar: "/placeholder.svg?height=32&width=32",
   }
+  const BASE_URL = "http://localhost:8080"
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -122,6 +126,7 @@ export default function GeneratePage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+  // console.log(input)
 
   const generateFileStructure = (prompt: string): FileNode[] => {
     const lowerPrompt = prompt.toLowerCase()
@@ -255,6 +260,19 @@ export default function GeneratePage() {
   }
 
   const handleSend = async (prompt?: string) => {
+    
+    if (input.trim() != "") {
+      axios.post(`${BASE_URL}/userpromt`, { Promt: input })
+        .then(res => {
+          console.log(res)
+          if (res.data) {
+            toast.success("Sent", { autoClose: 1500, style: { fontSize: "14px", width: "140px" } })
+          }
+          else {
+            toast.error("Faild", { autoClose: 1500 })
+          }
+        })
+    }
     const messageContent = prompt || input
     if (!messageContent.trim()) return
 
@@ -855,6 +873,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
 
   return (
     <div className="min-h-screen bg-background">
+      <ToastContainer/>
       <Header user={user} />
       <ChatWidget />
 
