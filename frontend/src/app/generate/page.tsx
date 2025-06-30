@@ -261,7 +261,7 @@ export default function GeneratePage() {
 
   const handleSend = async (prompt?: string) => {
     
-    if (input.trim() != "") {
+    if (input.trim()!= "") {
       axios.post(`${BASE_URL}/userpromt`, { Promt: input })
         .then(res => {
           console.log(res)
