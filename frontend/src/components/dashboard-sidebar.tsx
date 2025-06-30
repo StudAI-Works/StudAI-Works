@@ -3,8 +3,7 @@
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Home, FolderOpen, Building, Settings, HelpCircle, Plus, Sparkles } from "lucide-react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import {Link, useLocation} from "react-router-dom"
 
 const navigation = [
   { name: "Home", href: "/dashboard", icon: Home },
@@ -16,12 +15,12 @@ const navigation = [
 ]
 
 export function Sidebar() {
-  const pathname = usePathname()
+  const location = useLocation();
+  const pathname = location.pathname;
 
   return (
     <div className="w-64 bg-muted/30 border-r min-h-[calc(100vh-4rem)] p-4">
-      <div className="space-y-2">
-        <Link href="/editor">
+        <Link to="/editor">
           <Button className="w-full justify-start mb-4">
             <Plus className="mr-2 h-4 w-4" />
             New Project
@@ -31,7 +30,7 @@ export function Sidebar() {
         {navigation.map((item) => {
           const isActive = pathname === item.href
           return (
-            <Link key={item.name} href={item.href}>
+            <Link key={item.name} to={item.href}>
               <Button
                 variant={isActive ? "secondary" : "ghost"}
                 className={cn("w-full justify-start", isActive && "bg-secondary")}
@@ -43,6 +42,5 @@ export function Sidebar() {
           )
         })}
       </div>
-    </div>
   )
 }

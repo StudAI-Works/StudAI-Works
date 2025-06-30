@@ -2,13 +2,29 @@
 
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
+const ThemeContext = React.createContext<{
+  theme: "light" | "dark";
+  setTheme: (theme: "light" | "dark" | "system") => void;
+}>({
+  theme: "light",
+  setTheme: () => {},
+});
+
+function useTheme() {
+  const context = React.useContext(ThemeContext);
+  if (!context) {
+    throw new Error("useTheme must be used within a ThemeProvider");
+  }
+  return context;
+}
+
+// You will also need to wrap your app with a ThemeProvider that manages the theme state.
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export function ModeToggle() {
-  const { setTheme, theme } = useTheme()
+  const { setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
