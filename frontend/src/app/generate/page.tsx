@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -32,7 +32,7 @@ import {
 } from "lucide-react"
 import { Header } from "@/components/header"
 import { ChatWidget } from "@/components/chat-widget"
-import Link from "next/link"
+import {Link} from "react-router-dom"
 import JSZip from "jszip"
 import { saveAs } from "file-saver"
 
@@ -846,7 +846,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
             </div>
           </div>
         `
-        html = html.replace(/\{\[[\s\S]*?\][\s\S]*?map\([^\)]*?\)\}/g, featuresHtml)
+        html = html.replace(/\{\[[\s\S]*?\][\s\S]*?map\([^)]*?\)\}/g, featuresHtml)
       }
       return html.trim()
     }
@@ -867,7 +867,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
               <div className="inline-flex items-center space-x-2 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-sm mb-6">
                 <Sparkles className="h-4 w-4" />
                 <span>New: Edit faster with Design Mode</span>
-                <Link href="#" className="underline">
+                <Link to="#" className="underline">
                   Try it now →
                 </Link>
               </div>
@@ -956,7 +956,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
                   <h2 className="text-2xl font-bold">From the Community</h2>
                   <p className="text-muted-foreground">Explore what the community is building with Nexus.</p>
                 </div>
-                <Link href="#" className="text-primary hover:underline">
+                <Link to="#" className="text-primary hover:underline">
                   Browse All →
                 </Link>
               </div>
