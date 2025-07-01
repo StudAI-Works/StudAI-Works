@@ -17,6 +17,10 @@ function useTheme() {
   }
   return context;
 }
+const doc: HTMLElement = document.getElementsByTagName("html")[0]
+const HandleTheme = (theme : string) => {
+  doc.className = theme
+}
 
 // You will also need to wrap your app with a ThemeProvider that manages the theme state.
 
@@ -45,15 +49,15 @@ export function ModeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onClick={() => HandleTheme("light")}>
           <Sun className="mr-2 h-4 w-4" />
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onClick={() => HandleTheme("dark")}>
           <Moon className="mr-2 h-4 w-4" />
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem onClick={() => HandleTheme("system")}>
           <span className="mr-2">💻</span>
           System
         </DropdownMenuItem>
