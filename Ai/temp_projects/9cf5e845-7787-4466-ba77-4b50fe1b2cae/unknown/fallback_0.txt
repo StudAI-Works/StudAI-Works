@@ -1,0 +1,53 @@
+# backend/main.py
+from fastapi import FastAPI, Depends, Security
+from fastapi.security import OAuth2PasswordBearer, OAuth2
+from pydantic import BaseModel
+from typing import Optional
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String
+
+app = FastAPI()
+
+# Database setup
+SQLALCHEMY_DATABASE_URL = "sqlite:///student.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# OAuth2 setup
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+class Student(Base):
+    __tablename__ = "students"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    username = Column(String)
+    password = Column(String)
+
+Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_current_student(token: str = Depends(oauth2_scheme)):
+    db = SessionLocal()
+    student = db.query(Student).filter(Student.username == token).first()
+    return student
+
+@app.post("/login")
+async def login(username: str, password: str, db: Session = Depends(get_db)):
+    student = db.query(Student).filter(Student.username == username, Student.password == password).first()
+    if student:
+        return {"token": username}
+    else:
+        return {"error": "Invalid username or password"}
+
+@app.get("/student")
+async def read_student(student: Student = Depends(get_current_student)):
+    return student

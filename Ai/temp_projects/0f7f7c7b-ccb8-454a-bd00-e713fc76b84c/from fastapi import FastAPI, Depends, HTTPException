@@ -1,0 +1,49 @@
+from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel
+from typing import Optional
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+app = FastAPI()
+
+# Database setup
+SQLALCHEMY_DATABASE_URL = "sqlite:///student_management.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# OAuth2 setup
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+
+class Student(BaseModel):
+    id: int
+    name: str
+    email: str
+    password: str
+
+class StudentDB(Student):
+    id: int
+    password_hash: str
+
+@app.post("/api/login")
+async def login(username: str, password: str):
+    db = SessionLocal()
+    student = db.query(StudentDB).filter_by(username=username).first()
+    if not student or not student.password_hash == password:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = generate_token(student.id)
+    return {"token": token}
+
+@app.get("/api/student")
+async def get_student(token: str = Depends(oauth2_scheme)):
+    db = SessionLocal()
+    student_id = verify_token(token)
+    student = db.query(StudentDB).filter_by(id=student_id).first()
+    return {"name": student.name, "email": student.email}
+
+def generate_token(student_id: int):
+    # Implement token generation logic
+    pass
+
+def verify_token(token: str):
+    # Implement token verification logic
+    pass
