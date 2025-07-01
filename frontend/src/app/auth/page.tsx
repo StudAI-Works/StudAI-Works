@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Code, Mail, Eye, EyeOff } from "lucide-react"
 
 
-const API_URL = "http://localhost:8080/api/auth"; 
+const API_URL = "http://localhost:8080" 
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -42,7 +42,7 @@ export default function AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-
+    console.log(signInEmail)
     try {
       const response = await fetch(`${API_URL}/signin`, {
         method: "POST",
