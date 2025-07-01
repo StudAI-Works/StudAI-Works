@@ -5,7 +5,7 @@ import router from "../route/route";
 
 const PORT = 8080
 
-app.use("/api", router); 
+app.use(router); 
 
 app.listen(PORT, () => {
     console.log(`Server running in port:${PORT}`)
