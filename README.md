@@ -13,6 +13,24 @@ npm run dev
 cd backend
 npm run dev
 ```
+### To Start Ai
+- You need to install the packages in requirements.txt and also need to create an environment
+- For windows
+```bash
+  python -m venv myvenv
+  cd myvenv\Scripts\activate
+```
+- For linux
+```bash
+  python -m venv myvenv
+  cd myvenv\Scripts
+  source activate
+```
+- Start the file
+```bash
+cd Ai
+python main.py
+```
 ## Project Structure & Tech Stack
 
 ### 🖥️ Frontend
