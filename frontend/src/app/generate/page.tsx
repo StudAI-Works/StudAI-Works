@@ -260,20 +260,25 @@ export default function GeneratePage() {
   }
 
   const handleSend = async (prompt?: string) => {
-    
-    if (input.trim() != "") {
-      const loading = toast.loading("Processing", { style: { width: "160px"} })
-      axios.post(`${BASE_URL}/userpromt`, { Promt: input })
-        .then(res => {
-          // console.log(res.data.generatedCode)
-          if (res.status == 200) {
-            setGeneratedCode(res.data.generatedCode)
-            toast.update(loading, {render:"Success", type:"success", isLoading:false, autoClose:2000, style:{width:"160px", backgroundColor:"green", color : "white"} })
-          }
-          else {
-            toast.update(loading, { render: "Faild", type: "error", isLoading: false, autoClose: 2000, style: { width: "160px", backgroundColor: "red", color: "white" } })
-          }
-        })
+    console.log(input.length >= 10)
+    if (input.length <= 10) {
+      return toast.error("Promt must be atleast 10 characters", {autoClose:2000})
+    }
+    else {
+      if (input.trim() != "") {
+        const loading = toast.loading("Processing", { style: { width: "160px" } })
+        axios.post(`${BASE_URL}/userpromt`, { Promt: input })
+          .then(res => {
+            // console.log(res.data.generatedCode)
+            if (res.status == 200) {
+              setGeneratedCode(res.data.generatedCode)
+              toast.update(loading, { render: "Success", type: "success", isLoading: false, autoClose: 2000, style: { width: "160px", backgroundColor: "green", color: "white" } })
+            }
+            else {
+              toast.update(loading, { render: "Faild", type: "error", isLoading: false, autoClose: 2000, style: { width: "160px", backgroundColor: "red", color: "white" } })
+            }
+          })
+      }
     }
 
     const messageContent = prompt || input

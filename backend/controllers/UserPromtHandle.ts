@@ -2,6 +2,7 @@ import ApiHandler from "../utils/ApiHandler";
 import axios from "axios"
 let FAST_API = "http://localhost:8000"
 const UserPromtHandler = ApiHandler(async (req, res) => {
+    // console.log("Hello")
     const { Promt } = req.body;
     console.log(req.body)
     console.log("Started to generate")
