@@ -8,7 +8,12 @@ const UserPromtHandler = ApiHandler(async (req, res) => {
     console.log(Promt)
     const data = await axios.post(`${FAST_API}/generate`, { userInput: Promt })
     // console.log(data.data)
-    res.send(data.data)
+    if (!data) {
+         res.status(201).send("Error")
+    }
+    else {
+        res.status(200).send(data.data)
+    }
 })
 
 export default UserPromtHandler

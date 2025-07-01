@@ -262,16 +262,16 @@ export default function GeneratePage() {
   const handleSend = async (prompt?: string) => {
     
     if (input.trim() != "") {
-      const loading = toast.loading("Processing")
+      const loading = toast.loading("Processing", { style: { width: "160px"} })
       axios.post(`${BASE_URL}/userpromt`, { Promt: input })
         .then(res => {
           // console.log(res.data.generatedCode)
-          if (res.data) {
+          if (res.status == 200) {
             setGeneratedCode(res.data.generatedCode)
-            toast.update(loading, {render:"Success", type:"success", isLoading:false, autoClose:2000 })
+            toast.update(loading, {render:"Success", type:"success", isLoading:false, autoClose:2000, style:{width:"160px", backgroundColor:"green", color : "white"} })
           }
           else {
-            toast.error("Faild", { autoClose: 1500 })
+            toast.update(loading, { render: "Faild", type: "error", isLoading: false, autoClose: 2000, style: { width: "160px", backgroundColor: "red", color: "white" } })
           }
         })
     }
