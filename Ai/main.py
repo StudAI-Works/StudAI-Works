@@ -68,26 +68,51 @@ Example:
 
 def extract_files(text: str, base_dir: str) -> None:
     fallback_counter = 0
-    # Match code blocks with // path on the first line
-    pattern = re.compile(r"```(?:[a-zA-Z]+\n)?//\s*(.*?)\n(.*?)```", re.DOTALL)
-    matches = pattern.findall(text)
+    all_matches = []
 
-    if not matches:
-        logger.warning("No valid code blocks with paths found.")
+    # Match Format 1: ### `path` followed by ```lang\ncode\n```
+    heading_pattern = re.compile(
+        r"### [`\"](.*?)[`\"]\s*```([a-zA-Z]*)\n(.*?)```", re.DOTALL)
+    heading_matches = heading_pattern.findall(text)
+    logger.info(f"Found {len(heading_matches)} code blocks with markdown-heading paths.")
+    for path, lang, content in heading_matches:
+        all_matches.append((path.strip(), content.strip()))
+
+    # Match Format 2: ```lang\n// path\ncode\n```
+    inline_path_pattern = re.compile(
+        r"```(?:[a-zA-Z]*\n)?//\s*(.*?)\n(.*?)```", re.DOTALL)
+    inline_matches = inline_path_pattern.findall(text)
+    logger.info(f"Found {len(inline_matches)} code blocks with inline comment paths.")
+    for path, content in inline_matches:
+        all_matches.append((path.strip(), content.strip()))
+
+    if not all_matches:
+        logger.warning("No code blocks with file paths found.")
+        fallback_path = os.path.join(base_dir, "unknown", "raw_model_output.md")
+        os.makedirs(os.path.dirname(fallback_path), exist_ok=True)
+        with open(fallback_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        logger.warning(f"Saved fallback output to: {fallback_path}")
         return
 
-    for path, content in matches:
+    for path, content in all_matches:
         if not path:
             path = f"unknown/fallback_{fallback_counter}.txt"
             fallback_counter += 1
             logger.warning(f"Missing file path; saving fallback file: {path}")
 
-        clean_path = path.strip().replace("\\", "/")
+        clean_path = path.replace("\\", "/")
         full_path = os.path.join(base_dir, clean_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "w", encoding="utf-8") as f:
-            f.write(content.strip())
-        logger.info(f"Saved file: {clean_path}")
+            f.write(content)
+        logger.info(f"Saved file: {clean_path} ({len(content)} bytes)")
+
+    # Save raw output for debugging
+    raw_output_path = os.path.join(base_dir, "raw_model_output.md")
+    with open(raw_output_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    logger.info(f"Saved raw model output to: {raw_output_path}")
 
 
 @app.post("/generate")
@@ -156,6 +181,13 @@ async def generate_and_save(request: GenerateRequest):
         temp_dir = os.path.join("temp_projects", temp_id)
         os.makedirs(temp_dir, exist_ok=True)
 
+        # Save full raw output for debugging
+        raw_output_path = os.path.join(temp_dir, "raw_model_output.md")
+        with open(raw_output_path, "w", encoding="utf-8") as f:
+            f.write(output)
+        logger.info(f"Saved raw model output to: {raw_output_path}")
+
+        # Extract files from the output
         extract_files(output, temp_dir)
 
         return {

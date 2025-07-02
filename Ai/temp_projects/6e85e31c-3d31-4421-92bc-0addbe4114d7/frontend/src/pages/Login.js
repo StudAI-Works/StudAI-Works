@@ -9,9 +9,12 @@ function Login() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8000/login', { username, password });
+      const response = await axios.post('http://localhost:8000/api/login', {
+        username,
+        password,
+      });
       localStorage.setItem('token', response.data.token);
-      window.location.href = '/dashboard';
+      window.location.href = '/';
     } catch (error) {
       setError(error.message);
     }
@@ -21,15 +24,19 @@ function Login() {
     <div>
       <h1>Login</h1>
       <form onSubmit={handleSubmit}>
-        <label>Username:</label>
-        <input type="text" value={username} onChange={(event) => setUsername(event.target.value)} />
+        <label>
+          Username:
+          <input type="text" value={username} onChange={(event) => setUsername(event.target.value)} />
+        </label>
         <br />
-        <label>Password:</label>
-        <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <label>
+          Password:
+          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
         <br />
         <button type="submit">Login</button>
+        {error && <div style={{ color: 'red' }}>{error}</div>}
       </form>
-      {error && <div style={{ color: 'red' }}>{error}</div>}
     </div>
   );
 }

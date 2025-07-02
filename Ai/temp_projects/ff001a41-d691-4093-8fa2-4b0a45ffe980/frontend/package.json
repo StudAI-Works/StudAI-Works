@@ -1,4 +1,5 @@
-"name": "student-management-system",
+{
+  "name": "student-management-system-frontend",
   "version": "0.1.0",
   "dependencies": {
     "react": "^17.0.2",
