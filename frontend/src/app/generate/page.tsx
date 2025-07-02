@@ -35,7 +35,7 @@ import {
 } from "lucide-react"
 import { Header } from "@/components/header"
 import { ChatWidget } from "@/components/chat-widget"
-import {Link} from "react-router-dom"
+import { Link } from "react-router-dom"
 import JSZip from "jszip"
 import { saveAs } from "file-saver"
 
@@ -112,6 +112,7 @@ export default function GeneratePage() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [generatedCodep, setGeneratedCode] = useState<string>("")
+  const [projectId, setProjectId] = useState<string>("")
   const user = {
     name: "John Doe",
     email: "john@example.com",
@@ -262,16 +263,17 @@ export default function GeneratePage() {
   const handleSend = async (prompt?: string) => {
     console.log(input.length >= 10)
     if (input.length <= 10) {
-      return toast.error("Promt must be atleast 10 characters", {autoClose:2000})
+      return toast.error("Promt must be atleast 10 characters", { autoClose: 2000 })
     }
     else {
       if (input.trim() != "") {
         const loading = toast.loading("Processing", { style: { width: "160px" } })
-        axios.post(`${BASE_URL}/userpromt`, { Promt: input })
+        axios.post(`${BASE_URL}/generate`, { Promt: input })
           .then(res => {
-            // console.log(res.data.generatedCode)
+            console.log(res)
+            setProjectId(res.data)
+            rawoutput(res.data)
             if (res.status == 200) {
-              setGeneratedCode(res.data.generatedCode)
               toast.update(loading, { render: "Success", type: "success", isLoading: false, autoClose: 2000, style: { width: "160px", backgroundColor: "green", color: "white" } })
             }
             else {
@@ -280,6 +282,8 @@ export default function GeneratePage() {
           })
       }
     }
+
+
 
     const messageContent = prompt || input
     if (!messageContent.trim()) return
@@ -681,6 +685,7 @@ function ${messageContent.replace(/\s+/g, "")}App() {
 export default ${messageContent.replace(/\s+/g, "")}App`
       }
 
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "assistant",
@@ -720,6 +725,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
   }
 
   const downloadZip = async () => {
+
     if (!fileStructure.length) return
     const zip = new JSZip()
 
@@ -757,6 +763,35 @@ export default ${messageContent.replace(/\s+/g, "")}App`
     setExpandedFolders(newExpanded)
   }
 
+  const rawoutput = async (id: string) => {
+    await axios.get(`http://localhost:8000/project-raw-output/${id}`)
+      .then(res => setGeneratedCode(res.data))
+  }
+
+  const handlezip = async () => {
+    if (!projectId) {
+      toast.error("No project ID found")
+      return
+    }
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/download/${projectId}`,
+        { responseType: "blob" }
+      )
+      // Use the blueprint/project name if available, otherwise 'project'
+      let projectName = "project"
+      const lastAssistantMsg = [...messages].reverse().find(m => m.type === "assistant" && m.blueprint?.title)
+      if (lastAssistantMsg && lastAssistantMsg.blueprint?.title) {
+        projectName = lastAssistantMsg.blueprint.title.replace(/\s+/g, "-").toLowerCase()
+      }
+      saveAs(response.data, `${projectName}.zip`)
+      toast.success("Download started")
+    } catch (err) {
+      toast.error("Failed to download zip")
+      console.error(err)
+    }
+  }
+
   const FileTreeItem = ({ node, level = 0 }: { node: FileNode; level?: number }) => {
     const isExpanded = expandedFolders.has(node.path)
     const isSelected = selectedFile === node.path
@@ -764,9 +799,8 @@ export default ${messageContent.replace(/\s+/g, "")}App`
     return (
       <div>
         <div
-          className={`flex items-center space-x-2 py-1 px-2 hover:bg-muted/50 cursor-pointer rounded text-sm ${
-            isSelected ? "bg-primary/10 text-primary" : ""
-          }`}
+          className={`flex items-center space-x-2 py-1 px-2 hover:bg-muted/50 cursor-pointer rounded text-sm ${isSelected ? "bg-primary/10 text-primary" : ""
+            }`}
           style={{ paddingLeft: `${level * 12 + 8}px` }}
           onClick={() => {
             if (node.type === "folder") {
@@ -879,9 +913,15 @@ export default ${messageContent.replace(/\s+/g, "")}App`
     return null
   }
   console.log(generatedCodep)
+  function extractCodeForFile(rawOutput: string, filePath: string): string {
+    // Regex to match code blocks with the file path as the first line (// path)
+    const regex = new RegExp("```[a-zA-Z]*\\n//\\s*" + filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\n([\\s\\S]*?)```", "m");
+    const match = rawOutput.match(regex);
+    return match ? match[1].trim() : "// No code found for this file";
+  }
   return (
     <div className="min-h-screen bg-background">
-      <ToastContainer/>
+      <ToastContainer />
       <Header user={user} />
       <ChatWidget />
 
@@ -1039,11 +1079,10 @@ export default ${messageContent.replace(/\s+/g, "")}App`
                         className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-lg p-4 ${
-                            message.type === "user"
+                          className={`max-w-[80%] rounded-lg p-4 ${message.type === "user"
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted text-muted-foreground"
-                          }`}
+                            }`}
                         >
                           <p className="whitespace-pre-wrap">{message.content}</p>
                           {message.blueprint && (
@@ -1134,7 +1173,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
                             <Copy className="h-4 w-4 mr-2" />
                             Copy
                           </Button>
-                          <Button variant="outline" size="sm" onClick={downloadZip}>
+                          <Button variant="outline" size="sm" onClick={handlezip}>
                             <Download className="h-4 w-4 mr-2" />
                             Download Zip
                           </Button>
