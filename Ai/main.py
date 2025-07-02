@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import logging
+from fastapi.responses import PlainTextResponse
 
 # Load environment variables
 load_dotenv()
@@ -131,15 +132,11 @@ async def generate_output(request: GenerateRequest):
             ],
             temperature=0.3,
             max_tokens=4096,
-            stream=True
         )
 
         output = ""
-        for chunk in response:
-            if "choices" in chunk and len(chunk["choices"]) > 0:
-                delta = chunk["choices"][0].get("delta", {})
-                if "content" in delta:
-                    output += delta["content"]
+        if "choices" in response and len(response["choices"]) > 0:
+            output = response["choices"][0]["message"]["content"]
 
         if not output.strip():
             raise ValueError("Model returned an empty response")
@@ -166,15 +163,11 @@ async def generate_and_save(request: GenerateRequest):
             ],
             temperature=0.3,
             max_tokens=4096,
-            stream=True
         )
 
         output = ""
-        for chunk in response:
-            if "choices" in chunk and len(chunk["choices"]) > 0:
-                delta = chunk["choices"][0].get("delta", {})
-                if "content" in delta:
-                    output += delta["content"]
+        if "choices" in response and len(response["choices"]) > 0:
+            output = response["choices"][0]["message"]["content"]
 
         if not output.strip():
             raise ValueError("Model returned an empty response")
@@ -201,7 +194,39 @@ async def generate_and_save(request: GenerateRequest):
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+from fastapi.responses import FileResponse
+import zipfile
+
+# ...existing code...
+
+@app.get("/download/{project_id}")
+def download_project(project_id: str):
+    temp_dir = os.path.join("temp_projects", project_id)
+    if not os.path.isdir(temp_dir):
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    zip_path = os.path.join("temp_projects", f"{project_id}.zip")
+    # Zip the folder
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, _, files in os.walk(temp_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, temp_dir)
+                zipf.write(file_path, arcname)
+
+    return FileResponse(zip_path, filename=f"{project_id}.zip", media_type="application/zip")
+
+@app.get("/project-raw-output/{project_id}", response_class=PlainTextResponse)
+def get_raw_model_output(project_id: str):
+    temp_dir = os.path.join("temp_projects", project_id)
+    raw_output_path = os.path.join(temp_dir, "raw_model_output.md")
+    if not os.path.isfile(raw_output_path):
+        raise HTTPException(status_code=404, detail="raw_model_output.md not found")
+    with open(raw_output_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return content
+
 
 @app.get("/")
 def root():
-    return {"message": "StudAI API running."}
+    return {"message": "Working"}

@@ -4,16 +4,15 @@ import axios from 'axios';
 function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8000/api/login', { username, password });
+      const response = await axios.post('http://localhost:8000/login', { username, password });
       localStorage.setItem('token', response.data.token);
-      window.location.href = '/dashboard';
+      window.location.href = '/chatbot';
     } catch (error) {
-      setError(error.response.data.error);
+      console.error(error);
     }
   };
 
@@ -28,7 +27,6 @@ function Login() {
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <br />
         <button type="submit">Login</button>
-        {error && <div style={{ color: 'red' }}>{error}</div>}
       </form>
     </div>
   );
