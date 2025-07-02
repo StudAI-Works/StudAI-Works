@@ -111,7 +111,7 @@ export default function GeneratePage() {
   const [fileStructure, setFileStructure] = useState<FileNode[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
+  const [generatedCodep, setGeneratedCode] = useState<string>("")
   const user = {
     name: "John Doe",
     email: "john@example.com",
@@ -260,19 +260,27 @@ export default function GeneratePage() {
   }
 
   const handleSend = async (prompt?: string) => {
-    
-    if (input.trim()!= "") {
-      axios.post(`${BASE_URL}/userpromt`, { Promt: input })
-        .then(res => {
-          console.log(res)
-          if (res.data) {
-            toast.success("Sent", { autoClose: 1500, style: { fontSize: "14px", width: "140px" } })
-          }
-          else {
-            toast.error("Faild", { autoClose: 1500 })
-          }
-        })
+    console.log(input.length >= 10)
+    if (input.length <= 10) {
+      return toast.error("Promt must be atleast 10 characters", {autoClose:2000})
     }
+    else {
+      if (input.trim() != "") {
+        const loading = toast.loading("Processing", { style: { width: "160px" } })
+        axios.post(`${BASE_URL}/userpromt`, { Promt: input })
+          .then(res => {
+            // console.log(res.data.generatedCode)
+            if (res.status == 200) {
+              setGeneratedCode(res.data.generatedCode)
+              toast.update(loading, { render: "Success", type: "success", isLoading: false, autoClose: 2000, style: { width: "160px", backgroundColor: "green", color: "white" } })
+            }
+            else {
+              toast.update(loading, { render: "Faild", type: "error", isLoading: false, autoClose: 2000, style: { width: "160px", backgroundColor: "red", color: "white" } })
+            }
+          })
+      }
+    }
+
     const messageContent = prompt || input
     if (!messageContent.trim()) return
 
@@ -689,7 +697,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
             {
               name: "App.tsx",
               language: "tsx",
-              content: generatedCode,
+              content: generatedCodep,
               path: "src/App.tsx",
             },
           ],
@@ -870,7 +878,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
     }
     return null
   }
-
+  console.log(generatedCodep)
   return (
     <div className="min-h-screen bg-background">
       <ToastContainer/>
@@ -1186,7 +1194,7 @@ export default ${messageContent.replace(/\s+/g, "")}App`
                               )}
                               <div className="bg-muted/30 p-4 rounded-lg overflow-auto" style={{ minHeight: '400px', maxHeight: '70vh', width: '100%', minWidth: '100%' }}>
                                 <pre className="text-sm font-mono whitespace-pre min-w-fit overflow-x-auto" style={{ minWidth: '600px' }}>
-                                  <code>{currentCode || "// Generated code will appear here..."}</code>
+                                  <code>{generatedCodep || "// Generated code will appear here..."}</code>
                                 </pre>
                               </div>
                             </div>
