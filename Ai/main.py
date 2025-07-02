@@ -42,6 +42,7 @@ class GenerateRequest(BaseModel):
 def create_meta_prompt(user_input: str) -> str:
     return f'''
 You are an expert full-stack developer. Based on the user request below, generate a complete modular project.
+Do not use markdown explanations, or prose outside the code blocks. Only include code files.
 
 "{user_input}"
 
@@ -55,6 +56,7 @@ Example:
 ```jsx
 // frontend/src/pages/Login.jsx
 <file content>
+- For database schema put it into schema.sql file format with file path added similar to the frontend and backend files instead of a markdown schema 
 
 
 - Include:
