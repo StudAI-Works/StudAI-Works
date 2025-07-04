@@ -1,16 +1,16 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder } from "lucide-react";
+import { Header } from "@/components/header";
+import { Sidebar } from "@/components/dashboard-sidebar";
+import { Link } from "react-router-dom";
 
+import { useAuth } from "../context/authContext";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-// import { Badge } from "@/components/ui/badge"
-import { Badge } from "@/components/ui/badge"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder } from "lucide-react"
-import { Header } from "@/components/header"
-import { Sidebar } from "@/components/dashboard-sidebar"
-import {Link} from "react-router-dom"
 
 const mockProjects = [
   {
@@ -45,40 +45,42 @@ const mockProjects = [
     status: "active",
     type: "Docs",
   },
-]
+];
 
 export default function DashboardPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [projects] = useState(mockProjects)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [projects] = useState(mockProjects);
 
-  const user = {
-    name: "John Doe",
-    email: "john@example.com",
-    avatar: "/placeholder.svg?height=32&width=32",
-  }
+  const { user } = useAuth();
 
   const filteredProjects = projects.filter(
     (project) =>
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      project.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "deployed":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
       case "draft":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
       default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
     }
-  }
+  };
+
+  const headerUser = user ? {
+    name: user.fullName,
+    email: user.email,
+    avatar: "/placeholder.svg?height=32&width=32",
+  } : null;
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} />
+      {headerUser && <Header user={headerUser} />}
 
       <div className="flex">
         <Sidebar />
@@ -87,7 +89,9 @@ export default function DashboardPage() {
           <div className="max-w-7xl mx-auto">
             {/* Welcome Section */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Welcome back, {user.name}! 👋</h1>
+              <h1 className="text-3xl font-bold mb-2">
+                Welcome back, {user ? user.fullName : "Guest"}! 👋
+              </h1>
               <p className="text-muted-foreground">
                 Ready to build something amazing? Let's get started with your projects.
               </p>
@@ -185,5 +189,5 @@ export default function DashboardPage() {
         </main>
       </div>
     </div>
-  )
+  );
 }

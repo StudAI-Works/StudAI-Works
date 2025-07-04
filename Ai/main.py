@@ -58,6 +58,8 @@ def create_meta_prompt(user_input: str) -> str:
     """
     Convert raw user input into a detailed, structured prompt for Gemini
     """
+    # --- KEY CHANGE START ---
+    # This prompt instructs the AI how to format the code
     meta_prompt = f"""You are an expert Full-Stack Developer and AI/ML Prompt Engineer with 15+ years of experience in web development, specializing in creating production-ready applications.
 
 **Task**: Generate a complete, functional full-stack application based on the user's request: "{user_input}"
@@ -70,20 +72,30 @@ def create_meta_prompt(user_input: str) -> str:
 - Include database schema if data storage is needed
 
 **Technical Requirements**:
-- Frontend: Use modern HTML5, CSS3, JavaScript (ES6+), and responsive design
+- Frontend: Use modern HTML5, CSS3, JavaScript (ES6+), and responsive design, often with a framework like React or Vue.
 - Backend: Use Node.js with Express.js or Python with FastAPI
 - Database: Use appropriate database (SQL/NoSQL) based on requirements
 - Include proper API endpoints and routing
 - Add input validation and error handling
 - Include basic authentication if user management is needed
 
-**Format**: Structure your response with clear markdown sections:
-1. **Project Overview** - Brief description and features
-2. **Database Schema** - If applicable, include table structures
-3. **Backend Code** - API endpoints, routes, and server logic
-4. **Frontend Code** - HTML, CSS, and JavaScript
-5. **Setup Instructions** - How to run the application
-6. **API Documentation** - Endpoint descriptions and usage examples
+**Format**: Structure your response with clear markdown sections.
+**CRITICAL INSTRUCTION**: For every code block, you MUST include a comment on the very first line specifying its full file path.
+- For JavaScript/TypeScript/HTML/CSS files, use: `// path: src/components/Button.tsx`
+- For Python files, use: `# path: backend/server.py`
+- For other files like `package.json` or `README.md`, use: `// path: package.json`
+
+Your response structure should be:
+1.  **Project Overview** - Brief description and features.
+2.  **File Structure** - A simple tree view of the project files.
+3.  **Code** - All the code blocks for the project, each with its file path comment as instructed above.
+   - Example:
+     ```javascript
+     // path: src/App.tsx
+     import React from 'react';
+     // ... rest of the code
+     ```
+4.  **Setup Instructions** - How to run the application.
 
 **Code Quality Standards**:
 - Write clean, well-commented code
@@ -95,7 +107,7 @@ def create_meta_prompt(user_input: str) -> str:
 **Tone**: Technical, professional, and comprehensive. Provide complete working code that can be immediately implemented.
 
 Generate the complete application code now:"""
-
+    
     return meta_prompt
 
 @app.get("/")
