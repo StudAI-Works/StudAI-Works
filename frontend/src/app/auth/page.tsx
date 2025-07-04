@@ -24,7 +24,6 @@ export default function AuthPage() {
   const { login } = useAuth();
 
   const [activeTab, setActiveTab] = useState("signin");
-  // ... (rest of your state variables are fine)
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +62,6 @@ export default function AuthPage() {
         throw new Error(data.error || "Failed to sign in.");
       }
 
-      
       // Extract user data from the backend response and save it to the global state.
       const userData = {
         id: data.user.id,
@@ -117,6 +115,12 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   };
+
+  // --- ADDED: Placeholder function for Google Auth ---
+  const handleGoogleAuth = () => {
+    // In a real application, this would trigger the OAuth flow with your backend/provider
+    alert("Google authentication is not yet implemented.");
+  };
   
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -166,6 +170,14 @@ export default function AuthPage() {
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
+                
+                {/* --- ADDED: "Forgot your password?" link --- */}
+                <div className="mt-4 text-center">
+                  <Link to="#" className="text-sm text-muted-foreground hover:text-primary">
+                    Forgot your password?
+                  </Link>
+                </div>
+
               </TabsContent>
 
               <TabsContent value="signup">
@@ -194,6 +206,31 @@ export default function AuthPage() {
                 </form>
               </TabsContent>
             </Tabs>
+            
+            {/* --- ADDED: Separator and Google sign-in button --- */}
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+              <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={handleGoogleAuth} disabled={isLoading}>
+                <Mail className="mr-2 h-4 w-4" />
+                Google
+              </Button>
+            </div>
+
+            {/* --- ADDED: Terms and Privacy links --- */}
+            <p className="text-xs text-center text-muted-foreground mt-6">
+              By continuing, you agree to our{" "}
+              <Link to="#" className="underline hover:text-primary">Terms of Service</Link>{" "}
+              and{" "}
+              <Link to="#" className="underline hover:text-primary">Privacy Policy</Link>
+            </p>
+
           </CardContent>
         </Card>
       </div>
