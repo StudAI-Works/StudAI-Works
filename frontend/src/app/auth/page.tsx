@@ -12,11 +12,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Code, Mail, Eye, EyeOff } from "lucide-react"
 
+// --- IMPORT THE useAuth HOOK ---
+import { useAuth } from "../context/authContext";
+
 
 const API_URL = "http://localhost:8080" 
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  // --- GET THE login FUNCTION FROM THE CONTEXT ---
+  const { login } = useAuth();
 
   const [activeTab, setActiveTab] = useState("signin");
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +36,7 @@ export default function AuthPage() {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
 
+
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setError(null);
@@ -42,7 +48,7 @@ export default function AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    console.log(signInEmail)
+    
     try {
       const response = await fetch(`${API_URL}/signin`, {
         method: "POST",
@@ -53,11 +59,18 @@ export default function AuthPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        // Use the error message from the backend
         throw new Error(data.error || "Failed to sign in.");
       }
 
-      console.log("Sign in successful:", data);
+      // Extract user data from the backend response and save it to the global state.
+      const userData = {
+        id: data.user.id,
+        email: data.user.email,
+        fullName: data.user.user_metadata.full_name,
+      };
+      login(userData); // Save user to context!
+
+      // Navigate to the dashboard after successful login
       navigate("/dashboard");
 
     } catch (err) {
@@ -91,9 +104,7 @@ export default function AuthPage() {
       }
       
       setSignupSuccess(true);
-
       handleTabChange("signin");
-
       setSignUpName("");
       setSignUpEmail("");
       setSignUpPassword("");
@@ -105,11 +116,12 @@ export default function AuthPage() {
     }
   };
 
+  // --- ADDED: Placeholder function for Google Auth ---
   const handleGoogleAuth = () => {
-
+    // In a real application, this would trigger the OAuth flow with your backend/provider
     alert("Google authentication is not yet implemented.");
   };
-
+  
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -138,7 +150,6 @@ export default function AuthPage() {
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
 
-              {/* SIGN IN TAB */}
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4 pt-4">
                   <div className="space-y-2">
@@ -159,15 +170,16 @@ export default function AuthPage() {
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
-
+                
+                {/* --- ADDED: "Forgot your password?" link --- */}
                 <div className="mt-4 text-center">
                   <Link to="#" className="text-sm text-muted-foreground hover:text-primary">
                     Forgot your password?
                   </Link>
                 </div>
+
               </TabsContent>
 
-              {/* SIGN UP TAB */}
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4 pt-4">
                   <div className="space-y-2">
@@ -194,7 +206,8 @@ export default function AuthPage() {
                 </form>
               </TabsContent>
             </Tabs>
-
+            
+            {/* --- ADDED: Separator and Google sign-in button --- */}
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -210,15 +223,17 @@ export default function AuthPage() {
               </Button>
             </div>
 
+            {/* --- ADDED: Terms and Privacy links --- */}
             <p className="text-xs text-center text-muted-foreground mt-6">
               By continuing, you agree to our{" "}
               <Link to="#" className="underline hover:text-primary">Terms of Service</Link>{" "}
               and{" "}
               <Link to="#" className="underline hover:text-primary">Privacy Policy</Link>
             </p>
+
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
