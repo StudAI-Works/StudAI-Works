@@ -27,7 +27,7 @@ npm run dev
   source activate
 ```
 - Start the file
-```bash
+```
 cd Ai
 uvicorn main:app --reload --host localhost --port 8000
 ```
