@@ -11,17 +11,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreditCard, Key } from "lucide-react"
 import { Header } from "@/components/header"
 import { Sidebar } from "@/components/dashboard-sidebar"
+import { useAuth } from "../context/authContext" // Corrected path
+import { Navigate } from "react-router-dom"
 
 export default function AccountPage() {
-  const user = {
-    name: "John Doe",
-    email: "john@example.com",
-    avatar: "/placeholder.svg?height=80&width=80",
+  const { user, logout } = useAuth();
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
   }
+
+  const headerUser = {
+    name: user.fullName,
+    email: user.email,
+    avatar: "/placeholder.svg?height=32&width=32",
+  };
+
+  const nameParts = user.fullName.split(" ");
+  const firstName = nameParts[0] || "";
+  const lastName = nameParts.slice(1).join(" ") || "";
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} />
+      <Header user={headerUser} onLogout={logout} />
 
       <div className="flex">
         <Sidebar />
@@ -50,8 +62,8 @@ export default function AccountPage() {
                   <CardContent className="space-y-6">
                     <div className="flex items-center space-x-4">
                       <Avatar className="h-20 w-20">
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                        <AvatarFallback className="text-lg">{user.name.charAt(0)}</AvatarFallback>
+                        <AvatarImage src={"/placeholder.svg?height=80&width=80"} alt={user.fullName} />
+                        <AvatarFallback className="text-lg">{user.fullName.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div>
                         <Button variant="outline">Change Avatar</Button>
@@ -62,17 +74,17 @@ export default function AccountPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="firstName">First Name</Label>
-                        <Input id="firstName" defaultValue="John" />
+                        <Input id="firstName" defaultValue={firstName} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="lastName">Last Name</Label>
-                        <Input id="lastName" defaultValue="Doe" />
+                        <Input id="lastName" defaultValue={lastName} />
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" defaultValue={user.email} />
+                      <Input id="email" type="email" defaultValue={user.email} disabled />
                     </div>
 
                     <div className="space-y-2">
@@ -90,202 +102,20 @@ export default function AccountPage() {
                 </Card>
               </TabsContent>
 
+              {/* Other tabs remain unchanged */}
               <TabsContent value="security" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Password</CardTitle>
-                    <CardDescription>Change your password to keep your account secure</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">Current Password</Label>
-                      <Input id="currentPassword" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <Input id="newPassword" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                      <Input id="confirmPassword" type="password" />
-                    </div>
-                    <Button>Update Password</Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Two-Factor Authentication</CardTitle>
-                    <CardDescription>Add an extra layer of security to your account</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">SMS Authentication</div>
-                        <div className="text-sm text-muted-foreground">Receive codes via SMS</div>
-                      </div>
-                      <Switch />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">Authenticator App</div>
-                        <div className="text-sm text-muted-foreground">Use an authenticator app</div>
-                      </div>
-                      <Switch />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>API Keys</CardTitle>
-                    <CardDescription>Manage your API keys for external integrations</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <div className="font-medium">Production API Key</div>
-                          <div className="text-sm text-muted-foreground">Created on Dec 15, 2024</div>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Regenerate
-                        </Button>
-                      </div>
-                      <Button variant="outline">
-                        <Key className="mr-2 h-4 w-4" />
-                        Create New API Key
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <Card><CardHeader><CardTitle>Password</CardTitle><CardDescription>Change your password to keep your account secure</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="currentPassword">Current Password</Label><Input id="currentPassword" type="password" /></div><div className="space-y-2"><Label htmlFor="newPassword">New Password</Label><Input id="newPassword" type="password" /></div><div className="space-y-2"><Label htmlFor="confirmPassword">Confirm New Password</Label><Input id="confirmPassword" type="password" /></div><Button>Update Password</Button></CardContent></Card>
+                <Card><CardHeader><CardTitle>Two-Factor Authentication</CardTitle><CardDescription>Add an extra layer of security to your account</CardDescription></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">SMS Authentication</div><div className="text-sm text-muted-foreground">Receive codes via SMS</div></div><Switch /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Authenticator App</div><div className="text-sm text-muted-foreground">Use an authenticator app</div></div><Switch /></div></CardContent></Card>
+                <Card><CardHeader><CardTitle>API Keys</CardTitle><CardDescription>Manage your API keys for external integrations</CardDescription></CardHeader><CardContent><div className="space-y-4"><div className="flex items-center justify-between p-3 border rounded-lg"><div><div className="font-medium">Production API Key</div><div className="text-sm text-muted-foreground">Created on Dec 15, 2024</div></div><Button variant="outline" size="sm">Regenerate</Button></div><Button variant="outline"><Key className="mr-2 h-4 w-4" />Create New API Key</Button></div></CardContent></Card>
               </TabsContent>
-
               <TabsContent value="notifications" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Email Notifications</CardTitle>
-                    <CardDescription>Choose what email notifications you'd like to receive</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">Project Updates</div>
-                        <div className="text-sm text-muted-foreground">Get notified when projects are updated</div>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">Team Invitations</div>
-                        <div className="text-sm text-muted-foreground">Get notified when you're invited to teams</div>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">Marketing Emails</div>
-                        <div className="text-sm text-muted-foreground">Receive updates about new features</div>
-                      </div>
-                      <Switch />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Push Notifications</CardTitle>
-                    <CardDescription>Manage your push notification preferences</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">Build Notifications</div>
-                        <div className="text-sm text-muted-foreground">Get notified when builds complete</div>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <div className="text-sm font-medium">Collaboration</div>
-                        <div className="text-sm text-muted-foreground">Get notified about team activity</div>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                  </CardContent>
-                </Card>
+                <Card><CardHeader><CardTitle>Email Notifications</CardTitle><CardDescription>Choose what email notifications you'd like to receive</CardDescription></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Project Updates</div><div className="text-sm text-muted-foreground">Get notified when projects are updated</div></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Team Invitations</div><div className="text-sm text-muted-foreground">Get notified when you're invited to teams</div></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Marketing Emails</div><div className="text-sm text-muted-foreground">Receive updates about new features</div></div><Switch /></div></CardContent></Card>
+                <Card><CardHeader><CardTitle>Push Notifications</CardTitle><CardDescription>Manage your push notification preferences</CardDescription></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Build Notifications</div><div className="text-sm text-muted-foreground">Get notified when builds complete</div></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Collaboration</div><div className="text-sm text-muted-foreground">Get notified about team activity</div></div><Switch defaultChecked /></div></CardContent></Card>
               </TabsContent>
-
               <TabsContent value="billing" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Current Plan</CardTitle>
-                    <CardDescription>Manage your subscription and billing information</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <div className="font-medium">Pro Plan</div>
-                        <div className="text-sm text-muted-foreground">$29/month • Next billing: Jan 15, 2025</div>
-                      </div>
-                      <Badge>Active</Badge>
-                    </div>
-                    <div className="mt-4 space-x-2">
-                      <Button variant="outline">Change Plan</Button>
-                      <Button variant="outline">Cancel Subscription</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Payment Method</CardTitle>
-                    <CardDescription>Update your payment information</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <CreditCard className="h-8 w-8 text-muted-foreground" />
-                        <div>
-                          <div className="font-medium">•••• •••• •••• 4242</div>
-                          <div className="text-sm text-muted-foreground">Expires 12/2027</div>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Update
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Billing History</CardTitle>
-                    <CardDescription>View your past invoices and payments</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {[
-                        { date: "Dec 15, 2024", amount: "$29.00", status: "Paid" },
-                        { date: "Nov 15, 2024", amount: "$29.00", status: "Paid" },
-                        { date: "Oct 15, 2024", amount: "$29.00", status: "Paid" },
-                      ].map((invoice, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <div className="font-medium">{invoice.date}</div>
-                            <div className="text-sm text-muted-foreground">Pro Plan Subscription</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium">{invoice.amount}</div>
-                            <Badge variant="secondary" className="text-xs">
-                              {invoice.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                <Card><CardHeader><CardTitle>Current Plan</CardTitle><CardDescription>Manage your subscription and billing information</CardDescription></CardHeader><CardContent><div className="flex items-center justify-between p-4 border rounded-lg"><div><div className="font-medium">Pro Plan</div><div className="text-sm text-muted-foreground">$29/month • Next billing: Jan 15, 2025</div></div><Badge>Active</Badge></div><div className="mt-4 space-x-2"><Button variant="outline">Change Plan</Button><Button variant="outline">Cancel Subscription</Button></div></CardContent></Card>
+                <Card><CardHeader><CardTitle>Payment Method</CardTitle><CardDescription>Update your payment information</CardDescription></CardHeader><CardContent><div className="flex items-center justify-between p-4 border rounded-lg"><div className="flex items-center space-x-3"><CreditCard className="h-8 w-8 text-muted-foreground" /><div><div className="font-medium">•••• •••• •••• 4242</div><div className="text-sm text-muted-foreground">Expires 12/2027</div></div></div><Button variant="outline" size="sm">Update</Button></div></CardContent></Card>
+                <Card><CardHeader><CardTitle>Billing History</CardTitle><CardDescription>View your past invoices and payments</CardDescription></CardHeader><CardContent><div className="space-y-3">{[{ date: "Dec 15, 2024", amount: "$29.00", status: "Paid" }, { date: "Nov 15, 2024", amount: "$29.00", status: "Paid" }, { date: "Oct 15, 2024", amount: "$29.00", status: "Paid" },].map((invoice, index) => (<div key={index} className="flex items-center justify-between p-3 border rounded-lg"><div><div className="font-medium">{invoice.date}</div><div className="text-sm text-muted-foreground">Pro Plan Subscription</div></div><div className="text-right"><div className="font-medium">{invoice.amount}</div><Badge variant="secondary" className="text-xs">{invoice.status}</Badge></div></div>))}</div></CardContent></Card>
               </TabsContent>
             </Tabs>
           </div>

@@ -11,8 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Code, Mail, Eye, EyeOff } from "lucide-react"
-
-// --- IMPORT THE useAuth HOOK ---
 import { useAuth } from "../context/authContext";
 
 
@@ -20,7 +18,6 @@ const API_URL = "http://localhost:8080"
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  // --- GET THE login FUNCTION FROM THE CONTEXT ---
   const { login } = useAuth();
 
   const [activeTab, setActiveTab] = useState("signin");
@@ -61,16 +58,14 @@ export default function AuthPage() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to sign in.");
       }
-
-      // Extract user data from the backend response and save it to the global state.
+      
       const userData = {
         id: data.user.id,
         email: data.user.email,
         fullName: data.user.user_metadata.full_name,
       };
-      login(userData); // Save user to context!
+      login(userData);
 
-      // Navigate to the dashboard after successful login
       navigate("/dashboard");
 
     } catch (err) {
@@ -116,9 +111,7 @@ export default function AuthPage() {
     }
   };
 
-  // --- ADDED: Placeholder function for Google Auth ---
   const handleGoogleAuth = () => {
-    // In a real application, this would trigger the OAuth flow with your backend/provider
     alert("Google authentication is not yet implemented.");
   };
   
@@ -171,7 +164,6 @@ export default function AuthPage() {
                   </Button>
                 </form>
                 
-                {/* --- ADDED: "Forgot your password?" link --- */}
                 <div className="mt-4 text-center">
                   <Link to="#" className="text-sm text-muted-foreground hover:text-primary">
                     Forgot your password?
@@ -207,14 +199,13 @@ export default function AuthPage() {
               </TabsContent>
             </Tabs>
             
-            {/* --- ADDED: Separator and Google sign-in button --- */}
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <Separator />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
                 </div>
               </div>
               <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={handleGoogleAuth} disabled={isLoading}>
@@ -223,7 +214,6 @@ export default function AuthPage() {
               </Button>
             </div>
 
-            {/* --- ADDED: Terms and Privacy links --- */}
             <p className="text-xs text-center text-muted-foreground mt-6">
               By continuing, you agree to our{" "}
               <Link to="#" className="underline hover:text-primary">Terms of Service</Link>{" "}

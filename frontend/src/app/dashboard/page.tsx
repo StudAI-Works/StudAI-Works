@@ -1,4 +1,7 @@
+"use client"
+
 import { useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,51 +10,23 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder } from "lucide-react";
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/dashboard-sidebar";
-import { Link } from "react-router-dom";
-
 import { useAuth } from "../context/authContext";
 
-
 const mockProjects = [
-  {
-    id: 1,
-    name: "E-commerce Dashboard",
-    description: "Modern React dashboard for online store management",
-    lastModified: "2 hours ago",
-    status: "active",
-    type: "React",
-  },
-  {
-    id: 2,
-    name: "Task Management App",
-    description: "Full-stack task management with real-time updates",
-    lastModified: "1 day ago",
-    status: "deployed",
-    type: "Next.js",
-  },
-  {
-    id: 3,
-    name: "Portfolio Website",
-    description: "Personal portfolio with blog and project showcase",
-    lastModified: "3 days ago",
-    status: "draft",
-    type: "Static",
-  },
-  {
-    id: 4,
-    name: "API Documentation",
-    description: "Interactive API documentation with examples",
-    lastModified: "1 week ago",
-    status: "active",
-    type: "Docs",
-  },
+  { id: 1, name: "E-commerce Dashboard", description: "Modern React dashboard for online store management", lastModified: "2 hours ago", status: "active", type: "React", },
+  { id: 2, name: "Task Management App", description: "Full-stack task management with real-time updates", lastModified: "1 day ago", status: "deployed", type: "Next.js", },
+  { id: 3, name: "Portfolio Website", description: "Personal portfolio with blog and project showcase", lastModified: "3 days ago", status: "draft", type: "Static", },
+  { id: 4, name: "API Documentation", description: "Interactive API documentation with examples", lastModified: "1 week ago", status: "active", type: "Docs", },
 ];
 
 export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [projects] = useState(mockProjects);
+  const { user, logout } = useAuth();
 
-  const { user } = useAuth();
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   const filteredProjects = projects.filter(
     (project) =>
@@ -61,43 +36,37 @@ export default function DashboardPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "deployed":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "draft":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+      case "active": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+      case "deployed": return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+      case "draft": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
     }
   };
 
-  const headerUser = user ? {
+  const headerUser = {
     name: user.fullName,
     email: user.email,
     avatar: "/placeholder.svg?height=32&width=32",
-  } : null;
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      {headerUser && <Header user={headerUser} />}
+      <Header user={headerUser} onLogout={logout} />
 
       <div className="flex">
         <Sidebar />
 
         <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Welcome Section */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold mb-2">
-                Welcome back, {user ? user.fullName : "Guest"}! 👋
+                Welcome back, {user.fullName}! 👋
               </h1>
               <p className="text-muted-foreground">
                 Ready to build something amazing? Let's get started with your projects.
               </p>
             </div>
 
-            {/* Actions Bar */}
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -116,7 +85,6 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {/* Projects Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProjects.map((project) => (
                 <Card key={project.id} className="hover:shadow-lg transition-shadow cursor-pointer group">
@@ -130,27 +98,14 @@ export default function DashboardPage() {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
+                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
+                          <DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                          <DropdownMenuItem><Copy className="mr-2 h-4 w-4" />Duplicate</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -177,7 +132,7 @@ export default function DashboardPage() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery ? "Try adjusting your search terms" : "Create your first project to get started"}
                 </p>
-                <Link to="/editor">
+                <Link to="/editorpage">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Create New Project

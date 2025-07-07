@@ -13,20 +13,24 @@ import {
 import { Code, User, CreditCard, LogOut, Rocket, Database, Cloud } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
+// --- 1. MODIFY THE INTERFACE TO ACCEPT onLogout ---
 interface HeaderProps {
   user?: {
     name: string
     email: string
     avatar?: string
-  }
+  } | null; // Allow user to be null
+  onLogout?: () => void; // Add onLogout as an optional function prop
 }
 
-export function Header({ user }: HeaderProps) {
+// --- 2. ACCEPT onLogout AS A PROP ---
+export function Header({ user, onLogout }: HeaderProps) {
   const location = useLocation()
   const pathname = location.pathname
   const isAuthenticated = !!user
 
   return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-8">
           <Link to="/" className="flex items-center space-x-2">
@@ -138,7 +142,7 @@ export function Header({ user }: HeaderProps) {
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      <User className="h-4 w-4" />
+                      {user.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -162,7 +166,8 @@ export function Header({ user }: HeaderProps) {
                   Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                {/* --- 3. ATTACH onLogout TO THE CLICK EVENT --- */}
+                <DropdownMenuItem onClick={onLogout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>
@@ -180,5 +185,6 @@ export function Header({ user }: HeaderProps) {
           )}
         </div>
       </div>
+    </header>
   )
 }

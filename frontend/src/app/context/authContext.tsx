@@ -1,6 +1,8 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+"use client"
 
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 
+// Define the shape of your user object
 interface User {
   id: string;
   email: string;
@@ -13,34 +15,55 @@ interface AuthContextType {
   login: (userData: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
-// Create the context with a default value of undefined
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Create the provider component
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('nexus-user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error("Failed to parse user from localStorage", error);
+      localStorage.removeItem('nexus-user');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const login = (userData: User) => {
     setUser(userData);
+    localStorage.setItem('nexus-user', JSON.stringify(userData));
   };
 
+  
   const logout = () => {
     setUser(null);
-    // Here you would also call the backend to invalidate the session/token
+  
+    localStorage.removeItem('nexus-user');
+    
+    window.location.href = '/'; 
   };
 
   const isAuthenticated = !!user;
 
+  const value = { user, login, logout, isAuthenticated, isLoading };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Create a custom hook for easy access to the context
+// Custom hook for easy access to the context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

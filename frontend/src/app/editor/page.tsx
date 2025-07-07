@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { useAuth } from "../context/authContext";
+import { Navigate } from "react-router-dom";
 import {
   Play,
   Square,
@@ -85,15 +87,20 @@ function App() {
 export default App`
 
 export default function EditorPage() {
-  const [isRunning, setIsRunning] = useState(false)
-  const [projectName, setProjectName] = useState("My Awesome Project")
-  const [saveStatus, setSaveStatus] = useState("saved")
+  const [isRunning, setIsRunning] = useState(false);
+const [projectName, setProjectName] = useState("My Awesome Project");
+const [saveStatus, setSaveStatus] = useState("saved");
+const { user, logout } = useAuth();
 
-  const user = {
-    name: "John Doe",
-    email: "john@example.com",
-    avatar: "/placeholder.svg?height=32&width=32",
-  }
+if (!user) {
+  return <Navigate to="/auth" replace />;
+}
+
+const headerUser = {
+  name: user.fullName,
+  email: user.email,
+  avatar: "/placeholder.svg?height=32&width=32",
+};
 
   const handleRun = () => {
     setIsRunning(!isRunning)
@@ -138,7 +145,7 @@ export default function EditorPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} />
+      <Header user={headerUser} onLogout={logout} />
 
       {/* Top Bar */}
       <div className="border-b bg-muted/30 px-4 py-2">
