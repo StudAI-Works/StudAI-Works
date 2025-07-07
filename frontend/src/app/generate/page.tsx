@@ -90,7 +90,10 @@ export default function GeneratePage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // --- GET THE REAL USER FROM THE CONTEXT ---
-  const { user } = useAuth();
+  const { user , logout } = useAuth();
+  if (!user) {
+  return <Navigate to="/auth" replace />;
+}
   
   const BASE_URL = "http://localhost:8080"
 
@@ -200,7 +203,7 @@ export default function GeneratePage() {
   return (
     <div className="min-h-screen bg-background">
       <ToastContainer position="bottom-right" theme="dark" />
-      {headerUser && <Header user={headerUser} />}
+      <Header user={headerUser} onLogout={logout} />
       <ChatWidget />
       {messages.length === 0 ? (
         <div className="container mx-auto px-4 py-8">

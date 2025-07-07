@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { useAuth } from "../context/authContext";
+import { Navigate } from "react-router-dom";
 import {
   Search,
   MessageCircle,
@@ -229,20 +231,25 @@ const systemStatus = {
 }
 
 export default function HelpPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
-  const [ticketForm, setTicketForm] = useState({
-    subject: "",
-    category: "general",
-    priority: "medium",
-    description: "",
-  })
+  const [searchQuery, setSearchQuery] = useState("");
+const [selectedCategory, setSelectedCategory] = useState("all");
+const [ticketForm, setTicketForm] = useState({
+  subject: "",
+  category: "general",
+  priority: "medium",
+  description: "",
+});
+const { user, logout } = useAuth();
 
-  const user = {
-    name: "John Doe",
-    email: "john@example.com",
-    avatar: "/placeholder.svg?height=32&width=32",
-  }
+if (!user) {
+  return <Navigate to="/auth" replace />;
+}
+
+const headerUser = {
+  name: user.fullName,
+  email: user.email,
+  avatar: "/placeholder.svg?height=32&width=32",
+};
 
   // Knowledge Base Search
   const filteredKnowledge = knowledgeBase.filter((item) => {
@@ -306,7 +313,7 @@ export default function HelpPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} />
+      <Header user={headerUser} onLogout={logout} />
       <ChatWidget />
 
       <div className="flex">

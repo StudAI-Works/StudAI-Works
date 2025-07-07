@@ -94,7 +94,10 @@ export default function OrganizationPage() {
   const [newMessage, setNewMessage] = useState("")
 
   // --- GET THE REAL USER FROM THE CONTEXT ---
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  if (!user) {
+  return <Navigate to="/auth" replace />;
+  }
 
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
@@ -126,7 +129,7 @@ export default function OrganizationPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* --- PASS THE REAL USER TO THE HEADER --- */}
-      {headerUser && <Header user={headerUser} />}
+      <Header user={headerUser} onLogout={logout} />
 
       <div className="flex">
         <Sidebar />

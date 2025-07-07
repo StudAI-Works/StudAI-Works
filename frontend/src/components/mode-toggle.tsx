@@ -2,42 +2,20 @@
 
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
-const ThemeContext = React.createContext<{
-  theme: "light" | "dark";
-  setTheme: (theme: "light" | "dark" | "system") => void;
-}>({
-  theme: "light",
-  setTheme: () => {},
-});
-
-function useTheme() {
-  const context = React.useContext(ThemeContext);
-  if (!context) {
-    throw new Error("useTheme must be used within a ThemeProvider");
-  }
-  return context;
-}
-const doc: HTMLElement = document.getElementsByTagName("html")[0]
-const HandleTheme = (theme : string) => {
-  doc.className = theme
-}
-
-// You will also need to wrap your app with a ThemeProvider that manages the theme state.
+// --- IMPORTANT: We import useTheme from the library, not a custom context ---
+import { useTheme } from "next-themes" 
 
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export function ModeToggle() {
+  // This hook now correctly connects to your ThemeProvider
   const { setTheme } = useTheme()
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return null
-  }
 
   return (
     <DropdownMenu>
@@ -49,16 +27,14 @@ export function ModeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => HandleTheme("light")}>
-          <Sun className="mr-2 h-4 w-4" />
+        {/* The onClick handlers now call the library's setTheme function */}
+        <DropdownMenuItem onClick={() => setTheme("light")}>
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => HandleTheme("dark")}>
-          <Moon className="mr-2 h-4 w-4" />
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => HandleTheme("system")}>
-          <span className="mr-2">💻</span>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
           System
         </DropdownMenuItem>
       </DropdownMenuContent>
