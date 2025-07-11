@@ -1,18 +1,31 @@
 import { Router } from "express";
+import multer from "multer";
+import { protect } from "../middleware/authMiddleware"; 
 import UserPromtHandler from "../controllers/UserPromtHandle";
-// import authRoutes from "./authRoute";
 import { SignUpUser, SignInUser } from "../controllers/authController";
 import { Project } from "../controllers/Project";
+import { updateProfile, updateAvatar, getProfile } from "../controllers/profileController";
 
-const router: Router = Router()
+const router: Router = Router();
 
-router.route("/").get((req, res) => {
-    res.send("Welcome to StudAI Backend")
-})
-router.route("/generate").post(Project)
-router.route("/userpromt").post(UserPromtHandler)
-// router.use("/auth", authRoutes);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// --- Public routes (no protection) ---
+router.route("/").get((req, res) => { res.send("Welcome to StudAI Backend"); });
 router.post("/signup", SignUpUser);
 router.post("/signin", SignInUser);
 
-export default router
+// --- Protected routes (MUST have a valid token) ---
+router.put("/profile", protect, updateProfile); 
+router.post("/profile/avatar", protect, upload.single("avatar"), updateAvatar); 
+router.get("/profile", protect, getProfile); 
+
+
+
+router.post("/generate", protect, Project);
+router.post("/userpromt", protect, UserPromtHandler);
+
+export default router;

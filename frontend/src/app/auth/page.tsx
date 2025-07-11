@@ -64,7 +64,9 @@ export default function AuthPage() {
         email: data.user.email,
         fullName: data.user.user_metadata.full_name,
       };
-      login(userData);
+
+      // We now pass an object with both the user and the token
+      login({ user: userData, token: data.token });
 
       navigate("/dashboard");
 
