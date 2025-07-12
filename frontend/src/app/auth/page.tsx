@@ -11,12 +11,14 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Code, Mail, Eye, EyeOff } from "lucide-react"
+import { useAuth } from "../context/authContext";
 
 
 const API_URL = "http://localhost:8080" 
 
-export default function AuthPage() {
+export default function  AuthPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [activeTab, setActiveTab] = useState("signin");
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +33,7 @@ export default function AuthPage() {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
 
+
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setError(null);
@@ -42,7 +45,7 @@ export default function AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    console.log(signInEmail)
+    
     try {
       const response = await fetch(`${API_URL}/signin`, {
         method: "POST",
@@ -53,11 +56,18 @@ export default function AuthPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        // Use the error message from the backend
         throw new Error(data.error || "Failed to sign in.");
       }
+      console.log(data)
+      const userData = {
+        id: data.user.id,
+        email: data.user.email,
+        fullName: data.fullName[0].full_name,
+      };
 
-      console.log("Sign in successful:", data);
+      // We now pass an object with both the user and the token
+      login({ user: userData, token: data.token });
+
       navigate("/dashboard");
 
     } catch (err) {
@@ -74,6 +84,7 @@ export default function AuthPage() {
     setSignupSuccess(false);
 
     try {
+      console.log(signUpName)
       const response = await fetch(`${API_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,9 +102,7 @@ export default function AuthPage() {
       }
       
       setSignupSuccess(true);
-
       handleTabChange("signin");
-
       setSignUpName("");
       setSignUpEmail("");
       setSignUpPassword("");
@@ -106,10 +115,9 @@ export default function AuthPage() {
   };
 
   const handleGoogleAuth = () => {
-
     alert("Google authentication is not yet implemented.");
   };
-
+  
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -138,7 +146,6 @@ export default function AuthPage() {
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
 
-              {/* SIGN IN TAB */}
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4 pt-4">
                   <div className="space-y-2">
@@ -159,15 +166,15 @@ export default function AuthPage() {
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
-
+                
                 <div className="mt-4 text-center">
                   <Link to="#" className="text-sm text-muted-foreground hover:text-primary">
                     Forgot your password?
                   </Link>
                 </div>
+
               </TabsContent>
 
-              {/* SIGN UP TAB */}
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4 pt-4">
                   <div className="space-y-2">
@@ -194,14 +201,14 @@ export default function AuthPage() {
                 </form>
               </TabsContent>
             </Tabs>
-
+            
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <Separator />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
                 </div>
               </div>
               <Button variant="outline" className="w-full mt-4 bg-transparent" onClick={handleGoogleAuth} disabled={isLoading}>
@@ -216,9 +223,10 @@ export default function AuthPage() {
               and{" "}
               <Link to="#" className="underline hover:text-primary">Privacy Policy</Link>
             </p>
+
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }

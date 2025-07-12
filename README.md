@@ -27,9 +27,9 @@ npm run dev
   source activate
 ```
 - Start the file
-```bash
+```
 cd Ai
-python main.py
+uvicorn main:app --reload --host localhost --port 8000
 ```
 ## Project Structure & Tech Stack
 

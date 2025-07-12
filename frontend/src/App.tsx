@@ -1,40 +1,55 @@
-import React from 'react'
-// import Home from './Pages/Home'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import DashboardPage from './app/dashboard/page'
-import LandingPage from './app/page'
-import { ModeToggle } from './components/mode-toggle'
-import AuthPage from './app/auth/page'
-import AccountPage from './app/account/page'
-import Loading from './app/dashboard/loading'
-import EditorPage from './app/editor/page'
-import GeneratePage from './app/generate/page'
-import HelpPage from './app/help/page'
-import OrganizationPage from './app/organization/page'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+// Import Pages
+import LandingPage from './app/page';
+import AuthPage from './app/auth/page';
+import DashboardPage from './app/dashboard/page';
+import AccountPage from './app/account/page';
+import EditorPage from './app/editor/page';
+import GeneratePage from './app/generate/page';
+import HelpPage from './app/help/page';
+import OrganizationPage from './app/organization/page';
+
+// Import Providers and Guards
+import { AuthProvider } from './app/context/authContext';
+import { ThemeProvider } from './components/theme-provider'; 
+import ProtectedRoute from './components/protectedRoute';
+import PublicRoute from './components/publicRoutes';
+import Admin from './app/account/admin';
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* <Route path='/' element={<Home />} /> */}
-        <Route path='/dashboard' element={<DashboardPage />} />
-        <Route path='/' element={<LandingPage />} />
-        <Route path='/modetoggle' element={<ModeToggle />} />
-        <Route path='/auth' element={<AuthPage />} />
-        <Route path='/account' element={<AccountPage />} />
-        <Route path='/loading' element={<Loading />} />
-        <Route path='/editorpage' element={<EditorPage />} />
-        <Route path='/generate' element={<GeneratePage />} />
-        <Route path='/help' element={<HelpPage />} />
-        <Route path='/organization' element={<OrganizationPage />} />
-
-
-        GeneratePage
-
-
-
-    </Routes>
-    </BrowserRouter>
-  )
+    // --- WRAP EVERYTHING IN THE THEME PROVIDER ---
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* All your routes stay the same */}
+            <Route path='/' element={<LandingPage />} />
+            <Route element={<PublicRoute />}>
+              <Route path='/auth' element={<AuthPage />} />
+            </Route>
+            <Route element={<ProtectedRoute />}>
+              <Route path='/dashboard' element={<DashboardPage />} />
+              <Route path='/account' element={<AccountPage />} />
+              <Route path='/editor' element={<EditorPage />} />
+              <Route path='/generate' element={<GeneratePage />} />
+              <Route path='/help' element={<HelpPage />} />
+              <Route path='/studaiadmin' element={<Admin/>} />
+              
+              <Route path='/organization' element={<OrganizationPage />} />
+            </Route>
+            <Route path='*' element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;

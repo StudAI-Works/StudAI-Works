@@ -21,6 +21,9 @@ import { Plus, Users, Mail, MoreHorizontal, Crown, Edit, MessageSquare, Send } f
 import { Header } from "@/components/header"
 import { Sidebar } from "@/components/dashboard-sidebar"
 
+// --- IMPORT THE useAuth HOOK ---
+import { useAuth } from "../context/authContext"
+
 const mockOrganization = {
   name: "STUDAI EDUTECH",
   description: "Building the future of education technology",
@@ -90,10 +93,10 @@ export default function OrganizationPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false)
   const [newMessage, setNewMessage] = useState("")
 
-  const user = {
-    name: "John Doe",
-    email: "john@example.com",
-    avatar: "/placeholder.svg?height=32&width=32",
+  // --- GET THE REAL USER FROM THE CONTEXT ---
+  const { user, logout } = useAuth();
+  if (!user) {
+  return <Navigate to="/auth" replace />;
   }
 
   const getRoleColor = (role: string) => {
@@ -116,9 +119,17 @@ export default function OrganizationPage() {
     }
   }
 
+  // --- Create the user object for the Header, using the real user data ---
+  const headerUser = user ? {
+    name: user.fullName,
+    email: user.email,
+    avatar: "/placeholder.svg?height=32&width=32",
+  } : null;
+
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} />
+      {/* --- PASS THE REAL USER TO THE HEADER --- */}
+      <Header user={headerUser} onLogout={logout} />
 
       <div className="flex">
         <Sidebar />
@@ -197,6 +208,7 @@ export default function OrganizationPage() {
               </div>
             </div>
 
+            {/* --- THE REST OF THE PAGE CONTENT IS NOW RESTORED --- */}
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Organization Info & Members */}
               <div className="lg:col-span-2 space-y-6">
