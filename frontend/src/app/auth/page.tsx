@@ -62,7 +62,7 @@ export default function  AuthPage() {
       const userData = {
         id: data.user.id,
         email: data.user.email,
-        fullName: data.fullName[0].full_name,
+        fullName: data.fullName[0].full_name || "No name",
       };
 
       // We now pass an object with both the user and the token
