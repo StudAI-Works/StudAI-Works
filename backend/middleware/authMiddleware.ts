@@ -10,7 +10,7 @@ export interface AuthenticatedRequest extends Request {
 
 export const protect = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let token;
-
+  // console.log(req)
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
@@ -18,6 +18,7 @@ export const protect = async (req: AuthenticatedRequest, res: Response, next: Ne
     try {
       // Get token from header (format: "Bearer TOKEN")
       token = req.headers.authorization.split(" ")[1];
+      console.log(req.headers.authorization.split(" ")[1])
 
       // Verify token with Supabase
       const { data: { user }, error } = await supabase.auth.getUser(token);
@@ -41,6 +42,8 @@ export const protect = async (req: AuthenticatedRequest, res: Response, next: Ne
   }
 
   if (!token) {
+    console.log(token)
+
     res.status(401).json({ error: "Not authorized, no token" });
     return; 
   }

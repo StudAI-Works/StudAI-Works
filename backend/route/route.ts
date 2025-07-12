@@ -21,11 +21,11 @@ router.post("/signin", SignInUser);
 // --- Protected routes (MUST have a valid token) ---
 router.put("/profile", protect, updateProfile); 
 router.post("/profile/avatar", protect, upload.single("avatar"), updateAvatar); 
-router.get("/profile", protect, getProfile); 
+router.get("/profile", getProfile); 
 
 
 
-router.post("/generate", protect, Project);
-router.post("/userpromt", protect, UserPromtHandler);
+router.post("/generate", Project);
+router.post("/userpromt", UserPromtHandler);
 
 export default router;
