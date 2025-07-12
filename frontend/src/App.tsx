@@ -16,7 +16,7 @@ import { AuthProvider } from './app/context/authContext';
 import { ThemeProvider } from './components/theme-provider'; 
 import ProtectedRoute from './components/protectedRoute';
 import PublicRoute from './components/publicRoutes';
-
+import Admin from './app/account/admin';
 function App() {
   return (
     // --- WRAP EVERYTHING IN THE THEME PROVIDER ---
@@ -40,6 +40,8 @@ function App() {
               <Route path='/editor' element={<EditorPage />} />
               <Route path='/generate' element={<GeneratePage />} />
               <Route path='/help' element={<HelpPage />} />
+              <Route path='/studaiadmin' element={<Admin/>} />
+              
               <Route path='/organization' element={<OrganizationPage />} />
             </Route>
             <Route path='*' element={<Navigate to="/" replace />} />

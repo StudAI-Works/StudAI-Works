@@ -43,6 +43,7 @@ export default function DashboardPage() {
     }
   };
 
+  console.log(user)
   const headerUser = {
     name: user.fullName,
     email: user.email,

@@ -15,8 +15,9 @@ export default function LandingPage() {
   const { user, isAuthenticated, logout } = useAuth();
 
   // --- 3. PREPARE USER DATA FOR THE HEADER ---
+  console.log(user)
   const headerUser = user ? {
-    name: user.fullName,
+    name: user.fullName || "New User",
     email: user.email,
     avatar: "/placeholder.svg?height=32&width=32", // You can customize avatar later
   } : null;

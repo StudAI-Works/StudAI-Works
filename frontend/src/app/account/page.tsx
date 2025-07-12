@@ -134,9 +134,9 @@ export default function AccountPage() {
       alert((error as Error).message);
     }
   };
-  
+  console.log(fullName)
   const headerUser = {
-    name: fullName,
+    name: fullName || "New User",
     email: user.email,
     avatar: avatarUrl || "/placeholder.svg?height=32&width=32",
   };

@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedSession = localStorage.getItem('nexus-session');
       if (storedSession) {
         const session: Session = JSON.parse(storedSession);
+        console.log(session)
         setUser(session.user);
         setToken(session.token);
       }
@@ -49,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = (sessionData: Session) => {
+    console.log(sessionData)
     // --- UPDATE: Store the full session ---
     setUser(sessionData.user);
     setToken(sessionData.token);

@@ -16,7 +16,7 @@ import { useAuth } from "../context/authContext";
 
 const API_URL = "http://localhost:8080" 
 
-export default function AuthPage() {
+export default function  AuthPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -58,11 +58,11 @@ export default function AuthPage() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to sign in.");
       }
-      
+      console.log(data)
       const userData = {
         id: data.user.id,
         email: data.user.email,
-        fullName: data.user.user_metadata.full_name,
+        fullName: data.fullName[0].full_name,
       };
 
       // We now pass an object with both the user and the token
@@ -84,6 +84,7 @@ export default function AuthPage() {
     setSignupSuccess(false);
 
     try {
+      console.log(signUpName)
       const response = await fetch(`${API_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
