@@ -13,7 +13,7 @@ import OrganizationPage from './app/organization/page';
 
 // Import Providers and Guards
 import { AuthProvider } from './app/context/authContext';
-import { ThemeProvider } from './components/theme-provider'; // <-- IMPORT YOUR THEME PROVIDER
+import { ThemeProvider } from './components/theme-provider'; 
 import ProtectedRoute from './components/protectedRoute';
 import PublicRoute from './components/publicRoutes';
 

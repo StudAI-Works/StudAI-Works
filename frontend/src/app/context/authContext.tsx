@@ -2,17 +2,23 @@
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 
-// Define the shape of your user object
+// --- NEW: Define the shape of the user and the session we will store ---
 interface User {
   id: string;
   email: string;
   fullName: string;
 }
 
-// Define the shape of the context
+interface Session {
+  user: User;
+  token: string;
+}
+
+// --- UPDATE: Add getToken to the context type ---
 interface AuthContextType {
   user: User | null;
-  login: (userData: User) => void;
+  token: string | null; // Keep track of the token
+  login: (sessionData: Session) => void;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -22,39 +28,44 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem('nexus-user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      // --- UPDATE: We now store the entire session object ---
+      const storedSession = localStorage.getItem('nexus-session');
+      if (storedSession) {
+        const session: Session = JSON.parse(storedSession);
+        setUser(session.user);
+        setToken(session.token);
       }
     } catch (error) {
-      console.error("Failed to parse user from localStorage", error);
-      localStorage.removeItem('nexus-user');
+      console.error("Failed to parse session from localStorage", error);
+      localStorage.removeItem('nexus-session');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('nexus-user', JSON.stringify(userData));
+  const login = (sessionData: Session) => {
+    // --- UPDATE: Store the full session ---
+    setUser(sessionData.user);
+    setToken(sessionData.token);
+    localStorage.setItem('nexus-session', JSON.stringify(sessionData));
   };
 
-  
   const logout = () => {
     setUser(null);
-  
-    localStorage.removeItem('nexus-user');
-    
+    setToken(null);
+    // --- UPDATE: Clear the session, not just the user ---
+    localStorage.removeItem('nexus-session');
     window.location.href = '/'; 
   };
 
   const isAuthenticated = !!user;
 
-  const value = { user, login, logout, isAuthenticated, isLoading };
+  const value = { user, token, login, logout, isAuthenticated, isLoading };
 
   return (
     <AuthContext.Provider value={value}>
@@ -63,7 +74,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Custom hook for easy access to the context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

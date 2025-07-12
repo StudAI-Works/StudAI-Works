@@ -2,6 +2,7 @@ import ApiHandler from "../utils/ApiHandler";
 import axios from "axios";
 const Project = ApiHandler(async (req, res) => {
     const { Promt } = req.body
+    console.log(Promt)
     let response = await axios.post("http://localhost:8000/generate-and-save", {
         userInput : Promt
     })
