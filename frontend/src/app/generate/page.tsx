@@ -11,6 +11,8 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ToastContainer, toast } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import axios from "axios"
+import { useTheme } from "next-themes"
+
 import {
   Send,
   Sparkles,
@@ -108,6 +110,8 @@ export default function GeneratePage() {
     }
     return files
   }
+  const { setTheme } = useTheme();
+  let themes = localStorage.getItem("theme")
 
   const buildFileTree = (files: GeneratedFile[]): FileTreeNode[] => {
     const root: FileTreeNode = { name: 'root', path: '', type: 'folder', children: [] }
@@ -308,7 +312,7 @@ export default function GeneratePage() {
                             height="100%"
                             language={selectedFile ? getLanguage(selectedFile.path) : 'plaintext'}
                             value={selectedFile?.content ?? "// Select a file to view and edit its content"}
-                            theme={theme === 'dark' ? 'vs-dark' : 'light'}
+                              theme={themes === 'dark' ? 'vs-dark' : 'light'}
                             onChange={handleCodeEdit}
                             options={{
                               minimap: { enabled: false },
