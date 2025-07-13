@@ -31,32 +31,31 @@ import {
   File as FileIcon,
   ChevronRight,
   ChevronDown,
+  Construction,
 } from "lucide-react"
 import { Header } from "@/components/header"
 import { ChatWidget } from "@/components/chat-widget"
-import { Link } from "react-router-dom"
+import { Link, Navigate } from "react-router-dom"
 import JSZip from "jszip"
 import { saveAs } from "file-saver"
-// --- IMPORT THE useAuth HOOK ---
 import { useAuth } from "../context/authContext";
+import Editor from "@monaco-editor/react";
+
+// Placeholder theme hook. Replace with your actual implementation if you have one.
+const useSimpleTheme = () => {
+    const [theme] = useState('dark'); 
+    return { theme };
+};
 
 interface Message {
-  id: string
-  type: "user" | "assistant" | "error"
-  content: string
-  timestamp: Date
+  id: string; type: "user" | "assistant" | "error"; content: string; timestamp: Date;
 }
 interface GeneratedFile {
-  path: string
-  content: string
+  path: string; content: string;
 }
 interface FileTreeNode {
-  name: string
-  path: string
-  type: "file" | "folder"
-  children?: FileTreeNode[]
+  name: string; path: string; type: "file" | "folder"; children?: FileTreeNode[];
 }
-
 
 const quickActions = [
   { icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" },
@@ -69,14 +68,12 @@ const quickActions = [
   { icon: Smartphone, label: "Mobile App UI", description: "Responsive mobile interface" },
 ];
 
-
 const starterTemplates = [
   { name: "Next.js", description: "Build full-stack React apps", icon: "⚡", color: "bg-black text-white" },
   { name: "Supabase", description: "Spin up Postgres with auth", icon: "🟢", color: "bg-green-600 text-white" },
   { name: "Neon", description: "Start with Serverless Postgres", icon: "🔵", color: "bg-blue-600 text-white" },
   { name: "Upstash", description: "Get started with Serverless Redis", icon: "🔴", color: "bg-red-600 text-white" },
 ];
-
 
 export default function GeneratePage() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -89,13 +86,14 @@ export default function GeneratePage() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // --- GET THE REAL USER FROM THE CONTEXT ---
-  const { user , logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { theme } = useSimpleTheme();
+
   if (!user) {
-  return <Navigate to="/auth" replace />;
-}
+    return <Navigate to="/auth" replace />;
+  }
   
-  const BASE_URL = "http://localhost:8080"
+  const BASE_URL = "http://localhost:8080";
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -177,6 +175,20 @@ export default function GeneratePage() {
   const copyCode = () => { if (selectedFile) navigator.clipboard.writeText(selectedFile.content).then(() => toast.success("Copied!")) }
   const downloadZip = async () => { if (generatedFiles.length === 0) return; const zip = new JSZip(); generatedFiles.forEach(f => zip.file(f.path, f.content)); const blob = await zip.generateAsync({type:'blob'}); saveAs(blob, "studai-project.zip") }
   const toggleFolder = (path: string) => { setExpandedFolders(prev => { const next = new Set(prev); if (next.has(path)) next.delete(path); else next.add(path); return next }) }
+  
+  const handleCodeEdit = (newCode: string | undefined) => {
+    if (selectedFile && newCode !== undefined) {
+      const updatedFiles = generatedFiles.map(file => {
+        if (file.path === selectedFile.path) {
+          return { ...file, content: newCode };
+        }
+        return file;
+      });
+      setGeneratedFiles(updatedFiles);
+      setSelectedFile(prev => prev ? { ...prev, content: newCode } : null);
+    }
+  };
+
   const FileTreeItem = ({ node, level = 0 }: { node: FileTreeNode; level?: number }) => {
     const isExpanded = expandedFolders.has(node.path)
     const isSelected = selectedFile?.path === node.path
@@ -193,12 +205,24 @@ export default function GeneratePage() {
     )
   }
 
-  // Pass the real user to the Header
   const headerUser = user ? {
     name: user.fullName,
     email: user.email,
     avatar: "/placeholder.svg?height=32&width=32",
   } : null;
+
+  const getLanguage = (filePath: string) => {
+    const extension = filePath.split('.').pop();
+    switch (extension) {
+      case 'js': case 'jsx': return 'javascript';
+      case 'ts': case 'tsx': return 'typescript';
+      case 'css': return 'css';
+      case 'html': return 'html';
+      case 'json': return 'json';
+      case 'md': return 'markdown';
+      default: return 'plaintext';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,7 +248,6 @@ export default function GeneratePage() {
                 ))}
               </div>
             </div>
-            {/* THIS JSX SECTION IS NOW RESTORED */}
             <div className="mb-12">
               <h2 className="text-2xl font-bold mb-4">Starter Templates</h2>
               <div className="grid md:grid-cols-4 gap-4">
@@ -251,24 +274,60 @@ export default function GeneratePage() {
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={70} minSize={30}>
               <div className="h-full flex flex-col">
-                <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-1 flex-col">
-                  <div className="border-b p-2 flex items-center justify-between">
-                    <TabsList><TabsTrigger value="code"><Code className="h-4 w-4 mr-2" />Code</TabsTrigger><TabsTrigger value="preview"><Eye className="h-4 w-4 mr-2" />Preview</TabsTrigger></TabsList>
-                    <div className="flex items-center space-x-2"><Button variant="outline" size="sm" onClick={copyCode} disabled={!selectedFile}><Copy className="h-4 w-4 mr-2" />Copy</Button><Button variant="outline" size="sm" onClick={downloadZip} disabled={generatedFiles.length === 0}><Download className="h-4 w-4 mr-2" />Download ZIP</Button></div>
+                <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex-1 flex flex-col min-h-0">
+                  <div className="border-b p-2 flex items-center justify-between flex-shrink-0">
+                    <TabsList>
+                      <TabsTrigger value="code"><Code className="h-4 w-4 mr-2" />Code</TabsTrigger>
+                      <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-2" />Preview</TabsTrigger>
+                    </TabsList>
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" size="sm" onClick={copyCode} disabled={!selectedFile}><Copy className="mr-2 h-4 w-4" />Copy</Button>
+                      <Button variant="outline" size="sm" onClick={downloadZip} disabled={generatedFiles.length === 0}><Download className="h-4 w-4 mr-2" />Download ZIP</Button>
+                    </div>
                   </div>
-                  <TabsContent value="code" className="flex-1 flex m-0">
-                    <ResizablePanelGroup direction="horizontal" className="h-full">
-                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}><div className="h-full border-r bg-muted/20 flex flex-col"><div className="p-2 border-b"><h3 className="font-semibold text-sm">File Explorer</h3></div><ScrollArea className="flex-1 p-2">{fileTree.length > 0 ? (<div className="space-y-1">{fileTree.map((node) => (<FileTreeItem key={node.path} node={node} />))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm"><Folder className="h-8 w-8 mx-auto mb-2 opacity-50" /><p>Awaiting generation...</p></div>)}</ScrollArea></div></ResizablePanel>
+
+                  <TabsContent value="code" className="flex-1 flex flex-col min-h-0">
+                    <ResizablePanelGroup direction="horizontal" className="flex-1">
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        <div className="h-full border-r bg-muted/20 flex flex-col">
+                          <div className="p-2 border-b flex-shrink-0"><h3 className="font-semibold text-sm">File Explorer</h3></div>
+                          <ScrollArea className="flex-1 p-2">
+                            {fileTree.length > 0 ? (<div className="space-y-1">{fileTree.map((node) => (<FileTreeItem key={node.path} node={node} />))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm"><Folder className="h-8 w-8 mx-auto mb-2 opacity-50" /><p>Awaiting generation...</p></div>)}
+                          </ScrollArea>
+                        </div>
+                      </ResizablePanel>
+
                       <ResizableHandle />
-                      <ResizablePanel defaultSize={75}>
-                        <div className="h-full flex flex-col">
-                          <div className="p-2 border-b flex-shrink-0"><h3 className="font-semibold text-sm text-muted-foreground">{selectedFile?.path || "Select a file"}</h3></div>
-                          <div className="flex-1 min-h-0 overflow-auto"><pre className="text-sm font-mono p-4 whitespace-pre"><code>{selectedFile?.content || "// Your code will appear here..."}</code></pre></div>
+
+                      <ResizablePanel defaultSize={75} className="flex flex-col">
+                        <div className="p-2 border-b flex-shrink-0">
+                          <h3 className="font-semibold text-sm text-muted-foreground">{selectedFile?.path || "Select a file"}</h3>
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <Editor
+                            height="100%"
+                            language={selectedFile ? getLanguage(selectedFile.path) : 'plaintext'}
+                            value={selectedFile?.content ?? "// Select a file to view and edit its content"}
+                            theme={theme === 'dark' ? 'vs-dark' : 'light'}
+                            onChange={handleCodeEdit}
+                            options={{
+                              minimap: { enabled: false },
+                              wordWrap: "on",
+                              fontSize: 14,
+                              scrollBeyondLastLine: false,
+                            }}
+                          />
                         </div>
                       </ResizablePanel>
                     </ResizablePanelGroup>
                   </TabsContent>
-                  <TabsContent value="preview" className="flex-1 m-0"><div className="p-8">Preview will be implemented here.</div></TabsContent>
+                  
+                  <TabsContent value="preview" className="flex-1">
+                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
+                      <Construction className="h-16 w-16 mb-4" />
+                      <h3 className="text-xl font-semibold">Live Preview Coming Soon</h3>
+                    </div>
+                  </TabsContent>
                 </Tabs>
               </div>
             </ResizablePanel>
