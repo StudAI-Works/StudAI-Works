@@ -54,59 +54,72 @@ class GenerateResponse(BaseModel):
     generatedPrompt: str
     generatedCode: str
 
+
 def create_meta_prompt(user_input: str) -> str:
     """
-    Convert raw user input into a detailed, structured prompt for Gemini
+    Convert raw user input into a detailed, structured prompt for Gemini.
+    This version improves reliability of required files and structure.
     """
-    # --- KEY CHANGE START ---
-    # This prompt instructs the AI how to format the code
-    meta_prompt = f"""You are an expert Full-Stack Developer and AI/ML Prompt Engineer with 15+ years of experience in web development, specializing in creating production-ready applications.
+    meta_prompt = f"""
+You are an expert Full-Stack Developer and AI/ML Prompt Engineer with 15+ years of experience in building production-grade applications.
 
-**Task**: Generate a complete, functional full-stack application based on the user's request: "{user_input}"
+---
 
-**Context**: 
-- Create a modern, responsive web application
-- Include both frontend and backend components
-- Use industry best practices and clean code principles
-- Ensure the application is production-ready with proper error handling
-- Include database schema if data storage is needed
+**🧠 Task**: Build a complete full-stack application based on the user's request:  
+➡️ "{user_input}"
 
-**Technical Requirements**:
-- Frontend: Use modern HTML5, CSS3, JavaScript (ES6+), and responsive design, often with a framework like React or Vue.
-- Backend: Use Node.js with Express.js or Python with FastAPI
-- Database: Use appropriate database (SQL/NoSQL) based on requirements
-- Include proper API endpoints and routing
-- Add input validation and error handling
-- Include basic authentication if user management is needed
+---
 
-**Format**: Structure your response with clear markdown sections.
-**CRITICAL INSTRUCTION**: For every code block, you MUST include a comment on the very first line specifying its full file path.
-- For JavaScript/TypeScript/HTML/CSS files, use: `// path: src/components/Button.tsx`
-- For Python files, use: `# path: backend/server.py`
-- For other files like `package.json` or `README.md`, use: `// path: package.json`
+**📦 Folder Structure Guidelines**:
+- All projects must include these root folders:
+  - `frontend/` for all client-side code
+  - `backend/` for all server-side code
+- Within `frontend/src/`, you MUST include:
+  - `App.tsx`, `index.tsx`, and a **global stylesheet** named `styles.css`
 
-Your response structure should be:
-1.  **Project Overview** - Brief description and features.
-2.  **File Structure** - A simple tree view of the project files.
-3.  **Code** - All the code blocks for the project, each with its file path comment as instructed above.
-   - Example:
-     ```javascript
-     // path: src/App.tsx
-     import React from 'react';
-     // ... rest of the code
-     ```
-4.  **Setup Instructions** - How to run the application.
+---
 
-**Code Quality Standards**:
-- Write clean, well-commented code
-- Use proper naming conventions
-- Include error handling and validation
-- Make code modular and reusable
-- Follow security best practices
+**📄 Required Files**:
+- `frontend/src/styles.css`: Global stylesheet. Must always be created (even with minimal content).
+- `frontend/src/index.tsx`: Must import `./styles.css`
+- Ensure use of `.tsx` files for React components (no `.js` unless necessary)
+- Include `package.json` files in both frontend and backend if dependencies exist.
+- All imported files (e.g., `import X from './components/X'`) MUST be defined as actual code blocks with matching file paths.
+- Missing or broken import paths are NOT allowed.
 
-**Tone**: Technical, professional, and comprehensive. Provide complete working code that can be immediately implemented.
+---
 
-Generate the complete application code now:"""
+**🛠️ Tech Stack**:
+- Frontend: TypeScript, React, HTML5, CSS3
+- Backend: Node.js with Express OR Python with FastAPI (based on use-case)
+- Database: PostgreSQL, SQLite or NoSQL depending on app type
+- Use clean, modular architecture with folders and reusable components
+- Ensure error handling and API validation is included
+
+---
+
+**📂 Response Format**:
+1. ✅ **Project Overview** - A short description of what the app does
+2. 📁 **File Structure** - Tree view of folders and files
+3. 🔢 **Code Blocks** - Each block MUST begin with a file path comment:
+   - For TS/JS/CSS: `// path: frontend/src/styles.css`
+   - For Python: `# path: backend/api/main.py`
+   - For config: `// path: package.json`
+4. 🚀 **Setup Instructions** - Clear steps to install and run the app
+
+---
+
+**💡 Example for styles.css (must always include at least this):**
+"""
+    meta_prompt += """
+```css
+// path: frontend/src/styles.css
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+}"""
+
     
     return meta_prompt
 
