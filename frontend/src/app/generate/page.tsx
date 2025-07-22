@@ -133,19 +133,30 @@ export default function GeneratePage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }) }, [messages]);
   function parseAIResponse(response: string): GeneratedFile[] {
-    const files: GeneratedFile[] = [];
-    const regex = /```(\w+)?\n(?:\/\/|#|<!--)\s*path:\s*(.*?)\s*\n([\s\S]*?)```/g;
+  const files: GeneratedFile[] = [];
+  // Match markdown headers like #### path/to/file or **path/to/file** followed by a code block
+  const regex = /(?:####\s*(.*?)\s*\n|\*\*(.*?)\*\*\n)```(\w+)?\n([\s\S]*?)```/g;
+  let match;
 
-    let match;
-    while ((match = regex.exec(response)) !== null) {
-      const [_, lang, path, content] = match;
-      if (path && content) {
-        files.push({ path: path.trim(), content: content.trim() });
-      }
+  while ((match = regex.exec(response)) !== null) {
+    // Capture path from either #### path/to/file or **path/to/file**
+    const rawPath = match[1] ? match[1].trim() : match[2].trim();
+    // Remove leading or trailing single quotes
+    const path = rawPath.replace(/^'|'$/g, '');
+    const lang = match[3];
+    const content = match[4];
+    if (path && content) {
+      files.push({ path, content: content.trim() });
     }
-
-    return files;
   }
+
+  // Fallback to response.md if no files are parsed
+  if (files.length === 0) {
+    files.push({ path: "response.md", content: response });
+  }
+
+  return files;
+}
   const buildFileTree = (files: GeneratedFile[]): FileTreeNode[] => { const root: FileTreeNode = { name: 'root', path: '', type: 'folder', children: [] }; files.forEach(file => { let currentLevel = root; file.path.split('/').forEach((part, index, arr) => { if (!currentLevel.children) return; const isLast = index === arr.length - 1; let existing = currentLevel.children.find(c => c.name === part); if (existing) { currentLevel = existing; } else { const newNode: FileTreeNode = { name: part, path: arr.slice(0, index + 1).join('/'), type: isLast ? 'file' : 'folder', children: isLast ? undefined : [] }; currentLevel.children.push(newNode); currentLevel = newNode; } }); }); return root.children || []; };
 
   const handleSend = async (prompt?: string) => {
