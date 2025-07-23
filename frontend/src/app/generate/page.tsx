@@ -115,8 +115,8 @@ export default function GeneratePage() {
     });
 
     const activeFilePath = `/src/${mainFile.path}`;
-    if (files[activeFilePath]) {
-      files[activeFilePath].active = true;
+    if (files[activeFilePath] && typeof files[activeFilePath] === "object" && files[activeFilePath] !== null) {
+      (files[activeFilePath] as any).active = true;
     }
 
     return {
@@ -148,22 +148,51 @@ export default function GeneratePage() {
   }
   const buildFileTree = (files: GeneratedFile[]): FileTreeNode[] => { const root: FileTreeNode = { name: 'root', path: '', type: 'folder', children: [] }; files.forEach(file => { let currentLevel = root; file.path.split('/').forEach((part, index, arr) => { if (!currentLevel.children) return; const isLast = index === arr.length - 1; let existing = currentLevel.children.find(c => c.name === part); if (existing) { currentLevel = existing; } else { const newNode: FileTreeNode = { name: part, path: arr.slice(0, index + 1).join('/'), type: isLast ? 'file' : 'folder', children: isLast ? undefined : [] }; currentLevel.children.push(newNode); currentLevel = newNode; } }); }); return root.children || []; };
 
-  const handleSend = async (prompt?: string) => {
-    const messageContent = prompt || input;
-    if (messageContent.trim().length < 10) return toast.error("Prompt must be at least 10 characters long");
-    setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
-    setInput("");
-    setIsGenerating(true);
-    setGeneratedFiles([]); setFileTree([]); setSelectedFile(null);
-    const loadingToastId = toast.loading("Generating your project...");
-    try {
-      const res = await axios.post(`${BASE_URL}/userpromt`, { Promt: messageContent });
-      if (res.status === 200 && res.data.generatedCode) {
-        const files = parseAIResponse(res.data.generatedCode);
+const handleSend = async (prompt?: string) => {
+  const messageContent = prompt || input;
+  if (messageContent.trim().length < 10) return toast.error("Prompt must be at least 10 characters long");
+
+  // Add user message to chat
+  setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
+  setInput("");
+  setIsGenerating(true);
+  setGeneratedFiles([]);
+  setFileTree([]);
+  setSelectedFile(null);
+  
+  const loadingToastId = toast.loading("Generating your project...");
+
+  try {
+    const res = await axios.post(`${BASE_URL}/userpromt`, { Promt: messageContent });
+    console.log("Response from server:", res.data);
+
+    if (res.status === 200) {
+      const gotInformation = res.data.gotInformation;
+      const serverMessage = res.data.data; // The follow-up prompt or generated code string
+
+      if (gotInformation === false) {
+        // Show the follow-up prompt/message from server (res.data.data)
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'assistant',
+            content: serverMessage,
+            timestamp: new Date(),
+          }
+        ]);
+        toast.update(loadingToastId, { render: serverMessage, type: "info", isLoading: false, autoClose: 4000 });
+        setIsGenerating(false);
+        return;
+      } 
+      
+      if (gotInformation === true) {
+        // Proceed to parse and display generated code/files as before
+        const files = parseAIResponse(serverMessage);
         if (files.length === 0) {
-          const fallbackFile = { path: "response.md", content: res.data.generatedCode };
+          const fallbackFile = { path: "response.md", content: serverMessage };
           setGeneratedFiles([fallbackFile]);
-          setFileTree([{ name: "response.md", path: "response.md", type: 'file', children: undefined }])
+          setFileTree([{ name: "response.md", path: "response.md", type: 'file', children: undefined }]);
           setSelectedFile(fallbackFile);
         } else {
           setGeneratedFiles(files);
@@ -174,15 +203,21 @@ export default function GeneratePage() {
           setExpandedFolders(rootFolders);
         }
         toast.update(loadingToastId, { render: "Success!", type: "success", isLoading: false, autoClose: 2000 });
-      } else { throw new Error("Invalid response from server"); }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || "An unknown error occurred.";
-      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${errorMessage}`, timestamp: new Date() }]);
-      toast.update(loadingToastId, { render: `Error: ${errorMessage}`, type: "error", isLoading: false, autoClose: 4000 });
-    } finally {
-      setIsGenerating(false);
+      } else {
+        throw new Error("Invalid gotInformation flag from server.");
+      }
+    } else { 
+      throw new Error("Invalid response from server"); 
     }
-  };
+  } catch (err: any) {
+    const errorMessage = err.response?.data?.error || err.message || "An unknown error occurred.";
+    setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${errorMessage}`, timestamp: new Date() }]);
+    toast.update(loadingToastId, { render: `Error: ${errorMessage}`, type: "error", isLoading: false, autoClose: 4000 });
+  } finally {
+    setIsGenerating(false);
+  }
+};
+
 
   const handleCodeEdit = (newCode: string | undefined) => {
     if (selectedFile && newCode !== undefined) {

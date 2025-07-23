@@ -17,17 +17,21 @@ const UserPromtHandler = ApiHandler(async (req, res) => {
 
         console.log("Response from spec-chat:", resp);
         const gotInformation = resp.got_information; // boolean: true or false
-        if(gotInformation) {
+ 
             
         const data = await axios.post(`${FAST_API}/generate`, { userInput: Promt })
+        if(gotInformation) {
         if (!data) {
             res.status(201).send("Error")
         }
         else {
-            res.status(200).send(data.data)
+            res.status(200).send({ data: data.data, gotInformation: true });
         }
         }
-        const followupMessage = resp.followup; 
+        else
+        {
+            res.status(200).send({ data: resp.followup, gotInformation: false });
+        }
     } catch (error) {
         console.error(error);
         res.status(500).send("Error communicating with spec-chat service");
