@@ -13,18 +13,20 @@ const UserPromtHandler = ApiHandler(async (req, res) => {
         });
 
         // Parse response (adjust keys if your API returns differently)
-        const resp = response.data as { got_information: boolean; followup: string };
+        const resp = response.data as { got_information: boolean; specs: string;followup: string };
 
         console.log("Response from spec-chat:", resp);
         const gotInformation = resp.got_information; // boolean: true or false
- 
-            
-        const data = await axios.post(`${FAST_API}/generate`, { userInput: Promt })
+
         if(gotInformation) {
+        const specs= resp.specs; // string: the specs if gotInformation is true
+        
+        const data = await axios.post(`${FAST_API}/generate`, { userInput: Promt, specs: specs });
         if (!data) {
             res.status(201).send("Error")
         }
         else {
+            console.log("Response from generate:", data.data);
             res.status(200).send({ data: data.data, gotInformation: true });
         }
         }

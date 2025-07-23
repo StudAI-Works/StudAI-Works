@@ -74,6 +74,7 @@ model = genai.GenerativeModel('gemini-2.0-flash-exp')
 # Request/Response models
 class GenerateRequest(BaseModel):
     userInput: str
+    specs: str = None  # Optional specs for context
 
 class GenerateResponse(BaseModel):
     generatedPrompt: str
@@ -145,7 +146,7 @@ You are an expert Full-Stack Developer and AI/ML Prompt Engineer with 15+ years 
 
 ---
 
-**🛠️ Tech Stack**:
+**🛠️Default Tech Stack**:
 - Frontend: TypeScript, React, HTML5, CSS3
 - Backend: Node.js with Express OR Python with FastAPI (based on use-case)
 - Database: PostgreSQL, SQLite or NoSQL depending on app type
@@ -162,7 +163,11 @@ You are an expert Full-Stack Developer and AI/ML Prompt Engineer with 15+ years 
    - For Python: `# path: backend/api/main.py`
    - For config: `// path: package.json`
 4. 🚀 **Setup Instructions** - Clear steps to install and run the app
-
+Each code block MUST begin exactly with a file path comment line as the first line inside the block:
+**IMPORTANT:**  
+- Use triple backticks (```) to start and end each code block.  
+- The path comment must be the **very first line** inside the triple backticks, with no leading spaces or blank lines.  
+- This format is strictly enforced to allow precise parsing.
 ---
 
 **💡 Example for styles.css (must always include at least this):**
@@ -218,7 +223,7 @@ async def generate_code(request: GenerateRequest):
         # Create structured prompt
         detailed_prompt = create_meta_prompt(request.userInput)
         logger.info("Generated meta-prompt for Gemini")
-        
+        detailed_prompt += f"\n\nUser specs: {request.specs}" if request.specs else ""
         # Call Gemini API
         try:
             response = model.generate_content(detailed_prompt)

@@ -188,7 +188,9 @@ const handleSend = async (prompt?: string) => {
       
       if (gotInformation === true) {
         // Proceed to parse and display generated code/files as before
-        const files = parseAIResponse(serverMessage);
+        console.log("Parsing AI response for files...",serverMessage);
+        const files = parseAIResponse(serverMessage.generatedCode);
+        console.log("Parsed files:", files);
         if (files.length === 0) {
           const fallbackFile = { path: "response.md", content: serverMessage };
           setGeneratedFiles([fallbackFile]);
