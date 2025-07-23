@@ -6,13 +6,33 @@ const UserPromtHandler = ApiHandler(async (req, res) => {
     // console.log(req.body)
     console.log("Started to generate")
     console.log(Promt)
-    const data = await axios.post(`${FAST_API}/generate`, { userInput: Promt })
-    if (!data) {
-         res.status(201).send("Error")
+    try {
+        // Call the FastAPI /spec-chat endpoint
+        const response = await axios.post(`${FAST_API}/spec-chat`, {
+            user_message: Promt
+        });
+
+        // Parse response (adjust keys if your API returns differently)
+        const resp = response.data as { got_information: boolean; followup: string };
+
+        console.log("Response from spec-chat:", resp);
+        const gotInformation = resp.got_information; // boolean: true or false
+        if(gotInformation) {
+            
+        const data = await axios.post(`${FAST_API}/generate`, { userInput: Promt })
+        if (!data) {
+            res.status(201).send("Error")
+        }
+        else {
+            res.status(200).send(data.data)
+        }
+        }
+        const followupMessage = resp.followup; 
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Error communicating with spec-chat service");
     }
-    else {
-        res.status(200).send(data.data)
-    }
+    
 })
 
 export default UserPromtHandler

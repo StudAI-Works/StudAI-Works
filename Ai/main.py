@@ -2,6 +2,20 @@
 StudAI Works - AI Service
 FastAPI service for code generation using Gemini 2.5
 """
+import re
+import json
+
+def extract_json_from_llm(text: str):
+    matches = re.findall(r"``````", text, re.DOTALL)
+    if matches:
+        json_str = matches[0].strip()
+    else:
+        match = re.search(r"(\{.*\})", text, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+        else:
+            raise ValueError("No JSON found in model response")
+    return json.loads(json_str)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +25,19 @@ import os
 from typing import Optional
 import logging
 from dotenv import load_dotenv
+from pydantic import BaseModel
+from typing import List, Optional
+from fastapi import APIRouter
+from typing import Dict
 
+class AppSpecs(BaseModel):
+    app_name: Optional[str] = None
+    description: Optional[str] = None
+    tech_stack_frontend: Optional[str] = None
+    tech_stack_backend: Optional[str] = None
+    database: Optional[str] = None
+    main_features: Optional[List[str]] = None
+    additional_notes: Optional[str] = None
 # Load environment variables
 load_dotenv()
 
@@ -34,9 +60,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+print(f"GEMINI_API_KEY: {GEMINI_API_KEY}")  # Debugging line to check if key is loaded
 if not GEMINI_API_KEY:
     logger.error("GEMINI_API_KEY not found in environment variables")
     raise ValueError("GEMINI_API_KEY environment variable is required")
@@ -54,6 +79,37 @@ class GenerateResponse(BaseModel):
     generatedPrompt: str
     generatedCode: str
 
+def get_extraction_prompt(user_message: str, current_data: AppSpecs) -> str:
+    prior = f"""Current gathered info (use these as defaults if user doesn't correct them):
+{current_data.json(exclude_none=True)}
+
+User message: "{user_message}"
+
+Required fields (ask for missing): app_name, description, tech_stack_frontend, tech_stack_backend, database, main_features (as a list).
+"""
+    instruction = """
+1. Parse the user message and extract any new or corrected info for these fields.
+2. Return a JSON with all known fields filled.
+3. Identify missing fields.
+4. If any required fields remain missing, set "got_information" to false and write a short message asking the user *only* for those fields.
+5. Otherwise, set "got_information" to true and return a message confirming readiness to proceed.
+
+Format:
+{
+  "app_name": "...",
+  "description": "...",
+  "tech_stack_frontend": "...",
+  "tech_stack_backend": "...",
+  "database": "...",
+  "main_features": ["...", "..."],
+  "additional_notes": "...",
+  "got_information": true/false,
+  "followup": "Message to user"
+}
+
+Do not ask about fields that are already filled in unless the user changed them.
+"""
+    return prior + instruction
 
 def create_meta_prompt(user_input: str) -> str:
     """
@@ -199,6 +255,43 @@ async def generate_code(request: GenerateRequest):
             detail=f"Internal server error: {str(e)}"
         )
 
+spec_sessions: Dict[str, AppSpecs] = {}
+router = APIRouter()
+class SpecChatRequest(BaseModel):
+    user_message: str
+
+@router.post("/spec-chat")
+async def spec_chat(request: SpecChatRequest):
+    user_id = 1
+    user_message = request.user_message
+    print("Hello from spec_chat")
+    session = spec_sessions.get(user_id, AppSpecs())
+    print(f"Current session for user {user_id}: {session}")
+    prompt = get_extraction_prompt(user_message, session)
+    try:
+        response = model.generate_content(prompt)
+        response = model.generate_content(prompt)
+        result = extract_json_from_llm(response.text)
+    except Exception as e:
+        logger.error(f"Error parsing LLM response: {e}")
+        raise HTTPException(500, f"Error parsing AI response: {str(e)}")
+    # Convert empty dicts to None for Pydantic compatibility
+    def clean_value(val):
+        # Recursively handle nested lists/dicts if needed in future
+        if val == {}:
+            return None
+        return val
+
+    updated = AppSpecs(**{field: clean_value(result.get(field)) for field in AppSpecs.model_fields.keys()})
+    spec_sessions[user_id] = updated
+
+    return {
+     "specs": updated.model_dump(),
+     "got_information": result.get("got_information", False),
+     "followup": result.get("followup", "Please provide more details."),
+ }
+    
+
 @app.post("/generate-simple")
 async def generate_simple(request: GenerateRequest):
     """
@@ -218,7 +311,7 @@ async def generate_simple(request: GenerateRequest):
     except Exception as e:
         logger.error(f"Error in generate_simple: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
+app.include_router(router)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
