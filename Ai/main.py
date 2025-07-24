@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import Optional
-import openai
+from openai import AzureOpenAI
 import os
 import logging
 import time
@@ -46,10 +46,12 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 if not all([AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT_NAME, AZURE_OPENAI_API_VERSION]):
     raise ValueError("Missing Azure OpenAI configuration in environment variables")
 
-openai.api_key = AZURE_OPENAI_KEY
-openai.api_base = AZURE_OPENAI_ENDPOINT
-openai.api_type = "azure"
-openai.api_version = AZURE_OPENAI_API_VERSION
+# Initialize Azure OpenAI client
+client = AzureOpenAI(
+    api_key=AZURE_OPENAI_KEY,
+    api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT
+)
 
 # Rate limiting tokens (1M/min)
 MAX_TOKENS_PER_MIN = 1_000_000
@@ -75,8 +77,8 @@ def get_completion_with_continuation(user_input: str, section_prompt: str, previ
         {"role": "system", "content": "You are an expert software developer with a focus on clean, production-ready code."},
         {"role": "user", "content": section_prompt if not previous_response else f"{previous_response}\n[CONTINUE]"}
     ]
-    response = openai.ChatCompletion.create(
-        engine=AZURE_OPENAI_DEPLOYMENT_NAME,
+    response = client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT_NAME,
         messages=messages,
         temperature=0.3,
         max_tokens=8192,
@@ -84,7 +86,7 @@ def get_completion_with_continuation(user_input: str, section_prompt: str, previ
         frequency_penalty=0.1,
         presence_penalty=0.1
     )
-    return response.choices[0].message["content"]
+    return response.choices[0].message.content
 
 class GenerateRequest(BaseModel):
     userInput: str
@@ -107,63 +109,85 @@ Your task is to generate **production-grade, modular, scalable, and well-documen
 
 ### 🔧 Tech Stack
 - **Frontend**: React (TypeScript) + Tailwind CSS + Vite + React Router + Zustand
-- **Backend**: Python FastAPI + SQLAlchemy + PostgreSQL
+- **Backend**: Express.js (TypeScript) + Node.js + Supabase
+- **Database**: Supabase (PostgreSQL)
 - **State Management**: Zustand
-- **Authentication**: JWT (JSON Web Tokens)
+- **Authentication**: Supabase Auth + JWT
+- **Styling**: Tailwind CSS
+- **Build Tool**: Vite
 
 ---
 
 ### 📋 Project Requirements
-- Write clean, modular, DRY code using best practices (e.g., SOLID)
-- Include detailed inline comments and logging where appropriate
+- Write clean, modular, DRY code using best practices (e.g., SOLID principles)
+- Include detailed inline comments and proper TypeScript types
 - Provide a complete and runnable folder/file structure
-- Ensure:
-  - All imports work (no missing files or broken paths)
-  - `package.json`, `vite.config.ts`, `index.html`, `.env`, etc. are included and complete including packages inside the json so that npm install fixes all necessary dependencies
-  - `README.md` has full setup and usage instructions
-  - All paths and routing logic in React are correct and functional
-  - Make sure the index.html has proper scripts
+- Ensure ALL imports work correctly (no missing files or broken paths)
+- Include complete configuration files:
+  - Frontend: `package.json`, `vite.config.ts`, `index.html`, `tailwind.config.js`, `tsconfig.json`, `.env.example`
+  - Backend: `package.json`, `tsconfig.json`, `.env.example`
+- Make sure all environment variables are properly handled using:
+  - Frontend: `import.meta.env.VITE_VARIABLE_NAME`
+  - Backend: `process.env.VARIABLE_NAME`
+- Include comprehensive `README.md` with step-by-step setup instructions
+- All React Router paths should work correctly
+- Proper error handling and loading states
+- Responsive design with Tailwind CSS
 
 ---
 
 ### 📂 Output Format (Strict Markdown Format)
 Follow this exact format so the code can be parsed correctly:
 
-1. ✅ **Project Overview**: Describe app features, architecture, and high-level flow
-2. 📁 **Folder Structure**: Use a markdown tree format
-3. 🔢 **Code Blocks**:
-   - Use markdown headers like:
-     ```
-     #### path/to/file.ext
-     ```language
-     // code here
-     ```
-   - Keep each file in its own clearly separated section
-   - Ensure the code is complete and syntactically valid
-4. 🚀 **Setup Instructions**: Full steps to run the project
-6. 📝 **Notes**: List any assumptions or trade-offs
-7. the readme give in the end at once and do not use #### in the readme
+1. ✅ **Project Overview**: Describe app purpose, features, architecture, and data flow
+2. 📁 **Folder Structure**: Complete markdown tree format showing frontend/ and backend/ folders
+3. 🔢 **Frontend Code**: All React TypeScript components, hooks, stores, and config files
+4. 🔢 **Backend Code**: Express.js TypeScript API, middleware, routes, and Supabase integration
+5. 🚀 **Setup Instructions**: Complete step-by-step guide for both frontend and backend
+6. 📝 **Notes**: Environment variables, assumptions, and optional improvements
+
+Use markdown headers like:
+```
+#### frontend/src/App.tsx
+```typescript
+// code here
+```
+
+#### backend/src/server.ts
+```typescript
+// code here
+```
+
+---
+
+### 🛑 Critical Requirements for Environment Variables
+- Use `import.meta.env.VITE_SUPABASE_URL` and `import.meta.env.VITE_SUPABASE_ANON_KEY` for frontend
+- Create proper `.env.example` files with all required variables
+- Include environment variable setup in README
+- Handle missing environment variables gracefully with fallbacks or clear error messages
 
 ---
 
 ### 🛑 Large Output Instructions
-If output exceeds limit:
+If output exceeds token limit:
 - End with `[CONTINUE]`
-- In the next call, **resume exactly where the last output stopped** — don’t repeat completed sections
+- In the next response, **resume exactly where you stopped** — don't repeat completed sections
 
 ---
 
-Start by generating the full application for: **"{user_input}"**
+Generate the complete full-stack application for: **"{user_input}"**
+
+Make sure to create a fully functional project that can be immediately run after following the setup instructions.
     """
 
 # Section prompts
 SECTION_PROMPTS = {
     "overview": "Start with Part 1 - ✅ Project Overview. Describe the purpose, features, and architecture of the app based on the user's request.",
-    "structure": "Generate Part 2 - 📁 Folder Structure in markdown tree format.",
-    "frontend": "Generate Part 3 - 🔢 Code for the React Frontend using TypeScript, Tailwind CSS, Zustand, and Vite.",
-    "backend": "Generate Part 4 - 🔢 Code for the FastAPI Backend with PostgreSQL integration, auth, and logging.",
-    "setup": "Generate Part 5 - 🚀 Setup Instructions for installing dependencies, setting environment variables, and running the project.",
-    "notes": "Generate Part 6 - 📝 Notes about assumptions, limitations, and optional improvements."
+    "structure": "Generate Part 2 - 📁 Folder Structure in markdown tree format showing both frontend/ and backend/ directories.",
+    "frontend": "Generate Part 3 - 🔢 Frontend Code: All React TypeScript components, hooks, Zustand stores, Tailwind CSS, and Vite configuration files.",
+    "backend": "Generate Part 4 - 🔢 Backend Code: Express.js TypeScript server, API routes, middleware, Supabase integration, and authentication.",
+    "setup": "Generate Part 5 - 🚀 Setup Instructions for installing dependencies, configuring environment variables, setting up Supabase, and running both frontend and backend.",
+    "notes": "Generate Part 6 - 📝 Notes about environment variables, Supabase configuration, assumptions, limitations, and optional improvements."
 }
 
 @app.get("/")
@@ -171,12 +195,13 @@ async def root():
     return {"message": "StudAI Works Azure AI Service is running!", "status": "healthy"}
 
 @app.get("/health")
-@retry(retry=retry_if_exception_type(openai.error.OpenAIError), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def health_check():
     try:
-        openai.ChatCompletion.create(
-            engine=AZURE_OPENAI_DEPLOYMENT_NAME,
-            messages=[{"role": "user", "content": "Ping"}]
+        response = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=[{"role": "user", "content": "Ping"}],
+            max_tokens=10
         )
         return {"status": "healthy", "service": "Azure OpenAI connected"}
     except Exception as e:
@@ -184,7 +209,7 @@ async def health_check():
         raise HTTPException(status_code=503, detail="Azure OpenAI connection failed")
 
 @app.post("/generate", response_model=GenerateResponse)
-@retry(retry=retry_if_exception_type(openai.error.OpenAIError), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def generate_code(request: GenerateRequest):
     try:
         if not request.userInput or len(request.userInput.strip()) < 10:
@@ -216,19 +241,19 @@ async def generate_code(request: GenerateRequest):
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
 
 @app.post("/generate-simple")
-@retry(retry=retry_if_exception_type(openai.error.OpenAIError), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def generate_simple(request: GenerateRequest):
     try:
         simple_prompt = f"Create a simple web app for: {request.userInput}"
-        completion = openai.ChatCompletion.create(
-            engine=AZURE_OPENAI_DEPLOYMENT_NAME,
+        completion = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
             messages=[{"role": "user", "content": simple_prompt}],
             temperature=0.5,
             max_tokens=2048
         )
         return {
             "userInput": request.userInput,
-            "generatedCode": completion.choices[0].message["content"],
+            "generatedCode": completion.choices[0].message.content,
             "prompt": simple_prompt
         }
     except Exception as e:
