@@ -1,52 +1,93 @@
 """
 StudAI Works - AI Service
-FastAPI service for code generation using Gemini 2.5
+FastAPI service for code generation using Azure OpenAI (GPT-4 Turbo)
 """
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import google.generativeai as genai
-import os
-from typing import Optional
-import logging
 from dotenv import load_dotenv
+from typing import Optional
+from openai import AzureOpenAI
+import os
+import logging
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Load environment variables
 load_dotenv()
 
-# Configure logging
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
+# FastAPI app
 app = FastAPI(
     title="StudAI Works - AI Service",
-    description="AI-powered code generation service",
-    version="1.0.0"
+    description="AI-powered code generation service using Azure OpenAI",
+    version="3.0.0"
 )
 
-# Add CORS middleware to allow requests from frontend
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    logger.error("GEMINI_API_KEY not found in environment variables")
-    raise ValueError("GEMINI_API_KEY environment variable is required")
+# Azure OpenAI Config
+AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 
-genai.configure(api_key=GEMINI_API_KEY)
+if not all([AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT_NAME, AZURE_OPENAI_API_VERSION]):
+    raise ValueError("Missing Azure OpenAI configuration in environment variables")
 
-# Initialize Gemini model
-model = genai.GenerativeModel('gemini-2.0-flash-exp')
+# Initialize Azure OpenAI client
+client = AzureOpenAI(
+    api_key=AZURE_OPENAI_KEY,
+    api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT
+)
 
-# Request/Response models
+# Rate limiting tokens (1M/min)
+MAX_TOKENS_PER_MIN = 1_000_000
+tokens_used = 0
+token_window_start = time.time()
+
+def throttle_tokens(estimated_tokens: int):
+    global tokens_used, token_window_start
+    now = time.time()
+    if now - token_window_start > 60:
+        tokens_used = 0
+        token_window_start = now
+    tokens_used += estimated_tokens
+    if tokens_used > MAX_TOKENS_PER_MIN:
+        sleep_time = 60 - (now - token_window_start)
+        logger.warning(f"Throttling: sleeping for {sleep_time:.2f}s")
+        time.sleep(sleep_time)
+        tokens_used = estimated_tokens
+        token_window_start = time.time()
+
+def get_completion_with_continuation(user_input: str, section_prompt: str, previous_response: str = "") -> str:
+    messages = [
+        {"role": "system", "content": "You are an expert software developer with a focus on clean, production-ready code."},
+        {"role": "user", "content": section_prompt if not previous_response else f"{previous_response}\n[CONTINUE]"}
+    ]
+    response = client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT_NAME,
+        messages=messages,
+        temperature=0.3,
+        max_tokens=8192,
+        top_p=0.9,
+        frequency_penalty=0.1,
+        presence_penalty=0.1
+    )
+    return response.choices[0].message.content
+
 class GenerateRequest(BaseModel):
     userInput: str
 
@@ -54,177 +95,171 @@ class GenerateResponse(BaseModel):
     generatedPrompt: str
     generatedCode: str
 
+def create_base_prompt(user_input: str) -> str:
+    return f"""
+You are an expert Full-Stack Developer and Prompt Engineer with 25+ years of experience.
 
-def create_meta_prompt(user_input: str) -> str:
+Your task is to generate **production-grade, modular, scalable, and well-documented** code for a full-stack web application described below.
+
+---
+
+🧾 **User Request**: "{user_input}"
+
+---
+
+### 🔧 Tech Stack
+- **Frontend**: React (TypeScript) + Tailwind CSS + Vite + React Router + Zustand
+- **Backend**: Express.js (TypeScript) + Node.js + Supabase
+- **Database**: Supabase (PostgreSQL)
+- **State Management**: Zustand
+- **Authentication**: Supabase Auth + JWT
+- **Styling**: Tailwind CSS
+- **Build Tool**: Vite
+
+---
+
+### 📋 Project Requirements
+- Write clean, modular, DRY code using best practices (e.g., SOLID principles)
+- Include detailed inline comments and proper TypeScript types
+- Provide a complete and runnable folder/file structure
+- Ensure ALL imports work correctly (no missing files or broken paths)
+- Include complete configuration files:
+  - Frontend: `package.json`, `vite.config.ts`, `index.html`, `tailwind.config.js`, `tsconfig.json`, `.env.example`
+  - Backend: `package.json`, `tsconfig.json`, `.env.example`
+- Make sure all environment variables are properly handled using:
+  - Frontend: `import.meta.env.VITE_VARIABLE_NAME`
+  - Backend: `process.env.VARIABLE_NAME`
+- Include comprehensive `README.md` with step-by-step setup instructions
+- All React Router paths should work correctly
+- Proper error handling and loading states
+- Responsive design with Tailwind CSS
+
+---
+
+### 📂 Output Format (Strict Markdown Format)
+Follow this exact format so the code can be parsed correctly:
+
+1. ✅ **Project Overview**: Describe app purpose, features, architecture, and data flow
+2. 📁 **Folder Structure**: Complete markdown tree format showing frontend/ and backend/ folders
+3. 🔢 **Frontend Code**: All React TypeScript components, hooks, stores, and config files
+4. 🔢 **Backend Code**: Express.js TypeScript API, middleware, routes, and Supabase integration
+5. 🚀 **Setup Instructions**: Complete step-by-step guide for both frontend and backend
+6. 📝 **Notes**: Environment variables, assumptions, and optional improvements
+
+Use markdown headers like:
+```
+#### frontend/src/App.tsx
+```typescript
+// code here
+```
+
+#### backend/src/server.ts
+```typescript
+// code here
+```
+
+---
+
+### 🛑 Critical Requirements for Environment Variables
+- Use `import.meta.env.VITE_SUPABASE_URL` and `import.meta.env.VITE_SUPABASE_ANON_KEY` for frontend
+- Create proper `.env.example` files with all required variables
+- Include environment variable setup in README
+- Handle missing environment variables gracefully with fallbacks or clear error messages
+
+---
+
+### 🛑 Large Output Instructions
+If output exceeds token limit:
+- End with `[CONTINUE]`
+- In the next response, **resume exactly where you stopped** — don't repeat completed sections
+
+---
+
+Generate the complete full-stack application for: **"{user_input}"**
+
+Make sure to create a fully functional project that can be immediately run after following the setup instructions.
     """
-    Convert raw user input into a detailed, structured prompt for Gemini.
-    This version improves reliability of required files and structure.
-    """
-    meta_prompt = f"""
-You are an expert Full-Stack Developer and AI/ML Prompt Engineer with 15+ years of experience in building production-grade applications.
 
----
-
-**🧠 Task**: Build a complete full-stack application based on the user's request:  
-➡️ "{user_input}"
-
----
-
-**📦 Folder Structure Guidelines**:
-- All projects must include these root folders:
-  - `frontend/` for all client-side code
-  - `backend/` for all server-side code
-- Within `frontend/src/`, you MUST include:
-  - `App.tsx`, `index.tsx`, and a **global stylesheet** named `styles.css`
-
----
-
-**📄 Required Files**:
-- `frontend/src/styles.css`: Global stylesheet. Must always be created (even with minimal content).
-- `frontend/src/index.tsx`: Must import `./styles.css`
-- Ensure use of `.tsx` files for React components (no `.js` unless necessary)
-- Include `package.json` files in both frontend and backend if dependencies exist.
-- All imported files (e.g., `import X from './components/X'`) MUST be defined as actual code blocks with matching file paths.
-- Missing or broken import paths are NOT allowed.
-
----
-
-**🛠️ Tech Stack**:
-- Frontend: TypeScript, React, HTML5, CSS3
-- Backend: Node.js with Express OR Python with FastAPI (based on use-case)
-- Database: PostgreSQL, SQLite or NoSQL depending on app type
-- Use clean, modular architecture with folders and reusable components
-- Ensure error handling and API validation is included
-
----
-
-**📂 Response Format**:
-1. ✅ **Project Overview** - A short description of what the app does
-2. 📁 **File Structure** - Tree view of folders and files
-3. 🔢 **Code Blocks** - Each block MUST begin with a file path comment:
-   - For TS/JS/CSS: `// path: frontend/src/styles.css`
-   - For Python: `# path: backend/api/main.py`
-   - For config: `// path: package.json`
-4. 🚀 **Setup Instructions** - Clear steps to install and run the app
-
----
-
-**💡 Example for styles.css (must always include at least this):**
-"""
-    meta_prompt += """
-```css
-// path: frontend/src/styles.css
-body {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, sans-serif;
-}"""
-
-    
-    return meta_prompt
+# Section prompts
+SECTION_PROMPTS = {
+    "overview": "Start with Part 1 - ✅ Project Overview. Describe the purpose, features, and architecture of the app based on the user's request.",
+    "structure": "Generate Part 2 - 📁 Folder Structure in markdown tree format showing both frontend/ and backend/ directories.",
+    "frontend": "Generate Part 3 - 🔢 Frontend Code: All React TypeScript components, hooks, Zustand stores, Tailwind CSS, and Vite configuration files.",
+    "backend": "Generate Part 4 - 🔢 Backend Code: Express.js TypeScript server, API routes, middleware, Supabase integration, and authentication.",
+    "setup": "Generate Part 5 - 🚀 Setup Instructions for installing dependencies, configuring environment variables, setting up Supabase, and running both frontend and backend.",
+    "notes": "Generate Part 6 - 📝 Notes about environment variables, Supabase configuration, assumptions, limitations, and optional improvements."
+}
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    return {"message": "StudAI Works AI Service is running!", "status": "healthy"}
+    return {"message": "StudAI Works Azure AI Service is running!", "status": "healthy"}
 
 @app.get("/health")
+@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def health_check():
-    """Detailed health check"""
     try:
-        # Test Gemini API connection
-        test_response = model.generate_content("Hello")
-        return {
-            "status": "healthy",
-            "service": "StudAI Works AI Service",
-            "gemini_api": "connected",
-            "version": "1.0.0"
-        }
+        response = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=[{"role": "user", "content": "Ping"}],
+            max_tokens=10
+        )
+        return {"status": "healthy", "service": "Azure OpenAI connected"}
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        raise HTTPException(status_code=503, detail="Azure OpenAI connection failed")
 
 @app.post("/generate", response_model=GenerateResponse)
+@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def generate_code(request: GenerateRequest):
-    """
-    Main endpoint to generate code from user input
-    """
     try:
-        logger.info(f"Received request: {request.userInput}")
-        
-        # Validate input
         if not request.userInput or len(request.userInput.strip()) < 10:
-            raise HTTPException(
-                status_code=400, 
-                detail="User input must be at least 10 characters long"
-            )
-        
-        # Create structured prompt
-        detailed_prompt = create_meta_prompt(request.userInput)
-        logger.info("Generated meta-prompt for Gemini")
-        
-        # Call Gemini API
-        try:
-            response = model.generate_content(detailed_prompt)
-            generated_code = response.text
-            logger.info("Successfully received response from Gemini")
-            
-        except Exception as gemini_error:
-            logger.error(f"Gemini API error: {str(gemini_error)}")
-            raise HTTPException(
-                status_code=503,
-                detail=f"AI service temporarily unavailable: {str(gemini_error)}"
-            )
-        
-        # Validate response
-        if not generated_code:
-            raise HTTPException(
-                status_code=500,
-                detail="AI service returned empty response"
-            )
-        
-        # Return structured response
+            raise HTTPException(status_code=400, detail="Input too short")
+
+        base_prompt = create_base_prompt(request.userInput)
+        full_response = ""
+
+        for section_name, section_task in SECTION_PROMPTS.items():
+            logger.info(f"🔧 Generating section: {section_name}")
+            section_prompt = f"{base_prompt}\n\n{section_task}"
+            section_response = get_completion_with_continuation(request.userInput, section_prompt)
+
+            while "[CONTINUE]" in section_response:
+                logger.info(f"⏭ Continuing section: {section_name}")
+                next_chunk = get_completion_with_continuation(request.userInput, section_prompt, section_response)
+                section_response = section_response.replace("[CONTINUE]", "") + next_chunk
+
+            throttle_tokens(len(section_response) // 4)
+            full_response += f"\n\n---\n### 🔹 {section_name.capitalize()}\n\n{section_response.strip()}"
+
         return GenerateResponse(
-            generatedPrompt=detailed_prompt,
-            generatedCode=generated_code
-        )
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in generate_code: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            generatedPrompt=base_prompt.strip(),
+            generatedCode=full_response.strip()
         )
 
+    except Exception as e:
+        logger.error(f"❌ Error in /generate: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+
 @app.post("/generate-simple")
+@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def generate_simple(request: GenerateRequest):
-    """
-    Simplified endpoint for quick testing
-    """
     try:
-        simple_prompt = f"Create a simple web application for: {request.userInput}. Include HTML, CSS, and JavaScript code."
-        
-        response = model.generate_content(simple_prompt)
-        
+        simple_prompt = f"Create a simple web app for: {request.userInput}"
+        completion = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=[{"role": "user", "content": simple_prompt}],
+            temperature=0.5,
+            max_tokens=2048
+        )
         return {
             "userInput": request.userInput,
-            "generatedCode": response.text,
+            "generatedCode": completion.choices[0].message.content,
             "prompt": simple_prompt
         }
-        
     except Exception as e:
-        logger.error(f"Error in generate_simple: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error in /generate-simple: {str(e)}")
+        raise HTTPException(status_code=500, detail="Simple generation failed")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
