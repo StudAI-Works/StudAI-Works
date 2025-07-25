@@ -32,7 +32,7 @@ router.get("/profile", protect, getProfile);
 router.route("/allusers").get(protect, Allusers);
 
 // Conversational AI routes
-router.post("/api/start-conversation", protect, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+router.post("/api/start-conversation", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const response = await axios.post(`${FAST_API}/start-conversation`);
     res.status(200).json(response.data);
@@ -42,7 +42,8 @@ router.post("/api/start-conversation", protect, async (req: Request, res: Respon
   }
 });
 
-router.post("/api/refine", protect, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+router.post("/refine", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // console.log("refine")
   const { session_id, message } = req.body;
   if (!session_id || !message) {
     res.status(400).json({ error: "session_id and message are required" });

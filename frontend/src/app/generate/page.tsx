@@ -88,7 +88,7 @@ export default function GeneratePage() {
   const { user, logout } = useAuth();
   const { theme } = useTheme();
 
-  const BASE_URL = "http://localhost:3000";
+  const BASE_URL = "http://localhost:8080";
 
   const sandpackConfig = useMemo(() => {
     if (generatedFiles.length === 0) {
@@ -224,9 +224,11 @@ export default function GeneratePage() {
       });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
+      console.log(data)
       setSessionId(data.session_id);
       setMessages([{ id: Date.now().toString(), type: 'assistant', content: data.message, timestamp: new Date() }]);
       toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
+      return data.session_id;
     } catch (err: any) {
       toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     }
@@ -234,24 +236,26 @@ export default function GeneratePage() {
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
-    if (messageContent.trim().length < 10) {
-      toast.error("Prompt must be at least 10 characters long");
-      return;
-    }
+    
 
     setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
     setInput("");
 
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
+      let sessionid;
+    
       if (!sessionId) {
-        await startConversation();
+        sessionid = await startConversation();
+        localStorage.setItem("sessionid", sessionid)
       }
-      const res = await fetch(`${BASE_URL}/api/refine`, {
+      console.log(sessionid)
+      const res = await fetch(`${BASE_URL}/refine`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ session_id: sessionId, message: messageContent }),
+        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
       });
+    
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
@@ -594,7 +598,9 @@ export default function GeneratePage() {
                             'react': "^18.2.0",
                             "react-dom": "^18.2.0",
                             "react-router-dom": "^6.22.3",
-                            'tailwindcss': "^3.4.1"
+                            'tailwindcss': "^3.4.1",
+                            'axios': "^1.11.0",
+                            "react-icons": "^5.5.0"
                           }
                         }}
                       >
