@@ -85,7 +85,7 @@ export default function GeneratePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const { theme } = useTheme();
 
   const BASE_URL = "http://localhost:8080";
@@ -211,9 +211,9 @@ export default function GeneratePage() {
   };
 
   const getAuthHeaders = () => ({
-    Authorization: `Bearer ${user?.token}`,
-    'Content-Type': 'application/json',
-  });
+  "Content-Type": "application/json",
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+});
 
   const startConversation = async () => {
     const loadingToastId = toast.loading("Starting conversation...");
@@ -267,7 +267,8 @@ export default function GeneratePage() {
   };
 
   const handleGenerateCode = async () => {
-    if (!sessionId) {
+    const sessionid = localStorage.getItem("sessionid");
+    if (!sessionid) {
       toast.error("No active conversation session");
       return;
     }
@@ -280,10 +281,10 @@ export default function GeneratePage() {
     const loadingToastId = toast.loading("Generating code...");
 
     try {
-      const response = await fetch(`${BASE_URL}/api/generate`, {
+      const response = await fetch(`http://localhost:8000/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ session_id: sessionid }),
       });
 
       if (!response.ok) {

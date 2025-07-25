@@ -1,11 +1,12 @@
 # file: src/fastapi/main.py
 import os
+import copy
 import asyncio
 import logging
 import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from openai import AsyncAzureOpenAI, RateLimitError
@@ -41,6 +42,9 @@ AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 # --- In-Memory Session Storage ---
 CONVERSATION_SESSIONS = {}
 
+# CONVERSATION_REFINEMENT: Dict[str, List[Dict[str, str]]] = {}
+# CONVERSATION_GENERATION: Dict[str, List[Dict[str, str]]] = {}
+
 # --- Pydantic Models ---
 class ConversationRequest(BaseModel):
     session_id: str
@@ -72,8 +76,21 @@ The user and a project manager have already discussed the features. Your job is 
 - Backend: Python FastAPI + SQLAlchemy + PostgreSQL
 - State Management: Zustand
 
-### 📂 Output Format (Strict Markdown Format)
+### 📂 Output Format (Strict markdown Format)
 Follow this exact format for parsing. For each step, generate ONLY the content for that step.
+Use markdown headers like:
+```
+#### frontend/src/App.tsx
+```typescript
+// code here
+```
+
+#### backend/src/server.ts
+```typescript
+// code here
+```
+
+---
 
 1.  **Project Overview**: A high-level description based on the conversation.
 2.  **Folder Structure**: A markdown tree.
@@ -85,7 +102,7 @@ CODE_GEN_PLAN = {
     "Project Overview": "First, provide the 'Project Overview'. Summarize the app's features based on the entire conversation history.",
     "Folder Structure": "Next, generate the complete 'Folder Structure' in a markdown tree format.",
     "Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header.",
-    "README.md": "Finally, create the `README.md` file with complete setup instructions."
+    "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme"
 }
 
 # --- API Endpoints ---
@@ -132,49 +149,51 @@ async def refine_features(request: ConversationRequest):
     stop=stop_after_attempt(3),
     retry=retry_if_exception_type(RateLimitError)
 )
-async def stream_code_generation(request: GenerateRequest):
+# New function: Non-streamed generation
+async def run_code_generation(request: GenerateRequest) -> str:
     if request.session_id not in CONVERSATION_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found to generate code from.")
 
-    conversation_history = CONVERSATION_SESSIONS[request.session_id]
-    
+    conversation_history = copy.deepcopy(CONVERSATION_SESSIONS[request.session_id])
+
     messages = [
         {"role": "system", "content": CODE_GEN_SYSTEM_PROMPT},
         {"role": "user", "content": "Here is the full conversation history. Please generate the application based on this.\n\n" + "\n".join([f"{m['role']}: {m['content']}" for m in conversation_history if m['role'] != 'system'])}
     ]
 
+    full_output = ""
     try:
         for section_title, section_task in CODE_GEN_PLAN.items():
-            yield f"\n\n---\n## 🔹 {section_title}\n\n"
             messages.append({"role": "user", "content": section_task})
 
-            response_stream = await client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=AZURE_OPENAI_DEPLOYMENT_NAME,
                 messages=messages,
                 temperature=0.2,
                 max_tokens=8192,
-                stream=True
             )
-            
-            full_section_response = ""
-            async for chunk in response_stream:
-                content = chunk.choices[0].delta.content
-                if content:
-                    yield content
-                    full_section_response += content
-            
-            messages.append({"role": "assistant", "content": full_section_response})
+
+            section_response = response.choices[0].message.content
+            messages.append({"role": "assistant", "content": section_response})
+
+            full_output += f"\n\n---\n## 🔹 {section_title}\n\n{section_response}"
 
     except Exception as e:
-        logger.error(f"Error during streaming generation: {str(e)}")
-        yield f"\n\n--- E N D O F S T R E A M ---\n\nError: An error occurred during code generation: {str(e)}"
+        logger.error(f"Error during generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error during code generation: {str(e)}")
 
+    return full_output
+
+
+# Final API endpoint
 @app.post("/generate")
 async def generate_code(request: GenerateRequest):
-    return StreamingResponse(
-        stream_code_generation(request),
-        media_type="text/event-stream"
-    )
+    try:
+        full_output = await run_code_generation(request)
+        return Response(content=full_output, media_type='text/markdown')
+    except Exception as e:
+        logger.error(f"Error during generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
