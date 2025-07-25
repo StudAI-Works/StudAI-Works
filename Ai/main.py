@@ -73,7 +73,8 @@ The user and a project manager have already discussed the features. Your job is 
 
 ### 🔧 Tech Stack
 - Frontend: React (TypeScript) + Tailwind CSS + Vite
-- Backend: Python FastAPI + SQLAlchemy + PostgreSQL
+- make sure to include all necessary files to be able to download and run this project like index.html or index.tsx etc
+- Backend: Something compatible with react
 - State Management: Zustand
 
 ### 📂 Output Format (Strict markdown Format)
@@ -101,7 +102,7 @@ Use markdown headers like:
 CODE_GEN_PLAN = {
     "Project Overview": "First, provide the 'Project Overview'. Summarize the app's features based on the entire conversation history.",
     "Folder Structure": "Next, generate the complete 'Folder Structure' in a markdown tree format.",
-    "Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header.",
+    "Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header as well as make sure to include all files like index etc so that no import fails as well as make sure of having all necessary libraries in the package.json for frontend.",
     "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme"
 }
 
