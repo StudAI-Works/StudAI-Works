@@ -1,33 +1,105 @@
-import { Router } from "express";
+// file: src/routes/route.ts
+import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
-import { protect } from "../middleware/authMiddleware"; 
-import UserPromtHandler from "../controllers/UserPromtHandle";
+import axios from "axios";
+import { Readable } from "stream";
 import { SignUpUser, SignInUser } from "../controllers/authController";
 import { Project } from "../controllers/Project";
 import { updateProfile, updateAvatar, getProfile } from "../controllers/profileController";
 import Allusers from "../controllers/AllUsers";
+import { protect } from "../middleware/authMiddleware";
 
 const router: Router = Router();
+const FAST_API = "http://localhost:8000";
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// --- Public routes (no protection) ---
-router.route("/").get((req, res) => { res.send("Welcome to StudAI Backend"); });
+// Public routes
+router.route("/").get((req: Request, res: Response) => {
+  res.send("Welcome to StudAI Backend");
+});
+
 router.post("/signup", SignUpUser);
 router.post("/signin", SignInUser);
 
-// --- Protected routes (MUST have a valid token) ---
-router.put("/profile", protect, updateProfile); 
-router.post("/profile/avatar", protect, upload.single("avatar"), updateAvatar); 
-router.get("/profile",protect, getProfile); 
+// Protected routes
+router.put("/profile", protect, updateProfile);
+router.post("/profile/avatar", protect, upload.single("avatar"), updateAvatar);
+router.get("/profile", protect, getProfile);
+router.route("/allusers").get(protect, Allusers);
 
+// Conversational AI routes
+router.post("/api/start-conversation", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const response = await axios.post(`${FAST_API}/start-conversation`);
+    res.status(200).json(response.data);
+  } catch (error: any) {
+    console.error("Error starting conversation:", error.message);
+    res.status(error.response?.status || 500).json({ error: error.message || "Failed to start conversation" });
+  }
+});
 
+router.post("/refine", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // console.log("refine")
+  const { session_id, message } = req.body;
+  if (!session_id || !message) {
+    res.status(400).json({ error: "session_id and message are required" });
+    return;
+  }
 
-router.post("/generate", Project);
-router.post("/userpromt", UserPromtHandler);
-router.route("/allusers").get(Allusers)
+  try {
+    const response = await axios.post(`${FAST_API}/refine`, { session_id, message });
+    res.status(200).json(response.data);
+  } catch (error: any) {
+    console.error("Error refining features:", error.message);
+    res.status(error.response?.status || 500).json({ error: error.message || "Failed to refine features" });
+  }
+});
+
+router.post("/api/generate", protect, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const { session_id } = req.body;
+  if (!session_id) {
+    res.status(400).json({ error: "session_id is required" });
+    return;
+  }
+
+  try {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const response = await axios({
+      method: "post",
+      url: `${FAST_API}/generate`,
+      data: { session_id },
+      responseType: "stream",
+    }) as unknown as { data: Readable };
+
+    // Pipe the stream to the response
+    response.data.pipe(res);
+
+    // Handle stream errors
+    response.data.on("error", (error: any) => {
+      console.error("Streaming error:", error.message);
+      res.write(`data: Error: ${error.message}\n\n`);
+      res.end();
+    });
+
+    // Handle client disconnect
+    req.on("close", () => {
+      response.data.destroy();
+      console.log("Client disconnected, stream closed");
+    });
+  } catch (error: any) {
+    console.error("Error generating code:", error.message);
+    res.status(error.response?.status || 500).json({ error: error.message || "Failed to generate code" });
+  }
+});
+
+// Legacy route
+router.post("/generate", protect, Project);
 
 export default router;

@@ -1,35 +1,62 @@
-"use client"
+// file: src/pages/GeneratePage.tsx
+"use client";
 
-import { useState, useRef, useEffect, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
-import { ToastContainer, toast } from "react-toastify"
-import "react-toastify/dist/ReactToastify.css"
-import axios from "axios"
-import { useTheme } from "next-themes"
-import { Send, Sparkles, Code, Eye, Copy, Download, ImageIcon, FileText, Calculator, User, Layout, Database, Globe, Smartphone, Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown } from "lucide-react"
-import { Header } from "@/components/header"
-import { ChatWidget } from "@/components/chat-widget"
-import { Navigate } from "react-router-dom"
-import JSZip from "jszip"
-import { saveAs } from "file-saver"
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useTheme } from "next-themes";
+import { Send, Sparkles, Code, Eye, Copy, Download, ImageIcon, FileText, Calculator, User, Layout, Database, Globe, Smartphone, Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown } from "lucide-react";
+import { Header } from "@/components/header";
+import { ChatWidget } from "@/components/chat-widget";
+import { Navigate } from "react-router-dom";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview, SandpackFileExplorer } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 
 // Interfaces
-interface Message { id: string; type: "user" | "assistant" | "error"; content: string; timestamp: Date; }
-interface GeneratedFile { path: string; content: string; }
-interface FileTreeNode { name: string; path: string; type: "file" | "folder"; children?: FileTreeNode[]; }
+interface Message {
+  id: string;
+  type: "user" | "assistant" | "error" | "system";
+  content: string;
+  timestamp: Date;
+}
+interface GeneratedFile {
+  path: string;
+  content: string;
+}
+interface FileTreeNode {
+  name: string;
+  path: string;
+  type: "file" | "folder";
+  children?: FileTreeNode[];
+}
 
 // Constant Arrays
-const quickActions = [{ icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" }, { icon: FileText, label: "Landing Page", description: "Create a marketing landing page" }, { icon: User, label: "Sign Up Form", description: "Build authentication forms" }, { icon: Calculator, label: "Calculate Factorial", description: "Math and utility functions" }, { icon: Layout, label: "Dashboard", description: "Admin or user dashboard" }, { icon: Database, label: "CRUD App", description: "Full-stack data management" }, { icon: Globe, label: "Portfolio Site", description: "Personal or business portfolio" }, { icon: Smartphone, label: "Mobile App UI", description: "Responsive mobile interface" },];
-const starterTemplates = [{ name: "Next.js", description: "Build full-stack React apps", icon: "⚡", color: "bg-black text-white" }, { name: "Supabase", description: "Spin up Postgres with auth", icon: "🟢", color: "bg-green-600 text-white" }, { name: "Neon", description: "Start with Serverless Postgres", icon: "🔵", color: "bg-blue-600 text-white" }, { name: "Upstash", description: "Get started with Serverless Redis", icon: "🔴", color: "bg-red-600 text-white" },];
+const quickActions = [
+  { icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" },
+  { icon: FileText, label: "Landing Page", description: "Create a marketing landing page" },
+  { icon: User, label: "Sign Up Form", description: "Build authentication forms" },
+  { icon: Calculator, label: "Calculate Factorial", description: "Math and utility functions" },
+  { icon: Layout, label: "Dashboard", description: "Admin or user dashboard" },
+  { icon: Database, label: "CRUD App", description: "Full-stack data management" },
+  { icon: Globe, label: "Portfolio Site", description: "Personal or business portfolio" },
+  { icon: Smartphone, label: "Mobile App UI", description: "Responsive mobile interface" },
+];
+const starterTemplates = [
+  { name: "Next.js", description: "Build full-stack React apps", icon: "⚡", color: "bg-black text-white" },
+  { name: "Supabase", description: "Spin up Postgres with auth", icon: "🟢", color: "bg-green-600 text-white" },
+  { name: "Neon", description: "Start with Serverless Postgres", icon: "🔵", color: "bg-blue-600 text-white" },
+  { name: "Upstash", description: "Get started with Serverless Redis", icon: "🔴", color: "bg-red-600 text-white" },
+];
 
 // Boilerplate HTML
 const indexHtml = `<!DOCTYPE html>
@@ -64,22 +91,14 @@ const indexHtml = `<!DOCTYPE html>
 </html>`;
 
 // Dynamically created index.js content
-const createIndexJs = (mainFilePath: string) => `import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import App from '${mainFilePath}';
-import './styles.css';
-import './index.css';
+// const createIndexJs = (mainFilePath: string) => `import React from 'react';
+// import { createRoot } from 'react-dom/client';
+// import App from '${mainFilePath}';
+// import './styles.css';
 
-const container = document.getElementById('root');
-const root = createRoot(container);
-root.render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
-);`;
+// const container = document.getElementById('root');
+// const root = createRoot(container);
+// root.render(<React.StrictMode><App /></React.StrictMode>);`;
 
 const defaultStylesCss = `
 @tailwind base;
@@ -316,135 +335,21 @@ select:focus {
 `;
 
 export default function GeneratePage() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState("")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [selectedTab, setSelectedTab] = useState("code")
-  const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([])
-  const [fileTree, setFileTree] = useState<FileTreeNode[]>([])
-  const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null)
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedTab, setSelectedTab] = useState("code");
+  const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
+  const [fileTree, setFileTree] = useState<FileTreeNode[]>([]);
+  const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { user, logout } = useAuth();
-  const { theme } = useTheme();  // Function to process file content and fix import.meta issues
-  const processFileContent = (content: string, filePath: string): string => {
-    let processedContent = content;
+  const { user, token, logout } = useAuth();
+  const { theme } = useTheme();
 
-    // Fix common import path issues
-    processedContent = processedContent.replace(/from\s+['"]([^'"]*supabaseClient)['"]/g, "from '../api/supabaseClient'");
-    processedContent = processedContent.replace(/from\s+['"]([^'"]*\/supabase)['"]/g, "from '../lib/supabase'");
-    processedContent = processedContent.replace(/import\s+.*?\s+from\s+['"]([^'"]*supabaseClient)['"]/g, "import { supabase } from '../api/supabaseClient'");
-    
-    // Fix store imports
-    processedContent = processedContent.replace(/from\s+['"]([^'"]*\/stores\/authStore)['"]/g, "from '../stores/authStore'");
-    processedContent = processedContent.replace(/from\s+['"]([^'"]*\/stores)['"]/g, "from '../stores'");
-    
-    // Fix hook imports
-    processedContent = processedContent.replace(/from\s+['"]([^'"]*\/hooks\/useAuth)['"]/g, "from '../hooks/useAuth'");
-    processedContent = processedContent.replace(/from\s+['"]([^'"]*\/hooks)['"]/g, "from '../hooks'");
-    
-    // Fix type imports
-    processedContent = processedContent.replace(/from\s+['"]([^'"]*\/types)['"]/g, "from '../types'");
-    
-    // Fix zustand imports (newer versions don't have default export)
-    processedContent = processedContent.replace(/import\s+create\s+from\s+['"]zustand['"]/g, "import { create } from 'zustand'");
-    
-    // Fix relative imports that might be broken
-    processedContent = processedContent.replace(/from\s+['"]\.\.\//g, "from '../");
-    processedContent = processedContent.replace(/from\s+['"]\.\/(?!\.)/g, "from './");
-    
-    // Replace import.meta.env with process.env for compatibility
-    processedContent = processedContent.replace(/import\.meta\.env\.VITE_/g, 'process.env.REACT_APP_');
-
-    // Fix explicit VITE environment variable references in error messages and checks
-    processedContent = processedContent.replace(/VITE_SUPABASE_URL/g, 'REACT_APP_SUPABASE_URL');
-    processedContent = processedContent.replace(/VITE_SUPABASE_ANON_KEY/g, 'REACT_APP_SUPABASE_ANON_KEY');
-    processedContent = processedContent.replace(/VITE_API_URL/g, 'REACT_APP_API_URL');
-
-    // Handle Supabase client files specifically - replace error throwing with fallback values
-    // Fix Supabase client code to handle missing env vars gracefully
-    if (filePath.includes('supabase') || processedContent.includes('createClient') || processedContent.includes('supabase')) {
-      // Replace any throw statements related to Supabase configuration
-      processedContent = processedContent.replace(
-        /throw new Error\([^)]*supabase[^)]*\)/gi,
-        `console.warn('[Supabase] Using fallback values for preview environment')`
-      );
-
-      // Replace error checking patterns
-      processedContent = processedContent.replace(
-        /if\s*\(\s*!.*?supabase.*?url.*?\|\|\s*!.*?supabase.*?key.*?\)\s*\{[\s\S]*?throw[\s\S]*?\}/gi,
-        `// Supabase configuration handled with fallback values for preview`
-      );
-
-      // Add fallback values directly to environment variable extractions
-      processedContent = processedContent.replace(
-        /(const\s+\w*[Uu]rl\w*\s*=\s*process\.env\.REACT_APP_SUPABASE_URL)/g,
-        '$1 || "https://your-project.supabase.co"'
-      );
-
-      processedContent = processedContent.replace(
-        /(const\s+\w*[Kk]ey\w*\s*=\s*process\.env\.REACT_APP_SUPABASE_ANON_KEY)/g,
-        '$1 || "your-anon-key"'
-      );
-
-      // Handle more general patterns
-      processedContent = processedContent.replace(
-        /(process\.env\.REACT_APP_SUPABASE_URL)(?!\s*\|\|)/g,
-        '$1 || "https://your-project.supabase.co"'
-      );
-
-      processedContent = processedContent.replace(
-        /(process\.env\.REACT_APP_SUPABASE_ANON_KEY)(?!\s*\|\|)/g,
-        '$1 || "your-anon-key"'
-      );
-    }
-
-    // Add environment variable declarations at the top of files that use them
-    if (processedContent.includes('process.env.REACT_APP_')) {
-      const envVarDeclaration = `// Environment variables for preview
-declare global {
-  namespace NodeJS {
-    interface ProcessEnv {
-      REACT_APP_SUPABASE_URL?: string;
-      REACT_APP_SUPABASE_ANON_KEY?: string;
-      REACT_APP_API_URL?: string;
-    }
-  }
-}
-
-// Mock environment variables for preview
-if (typeof process === 'undefined') {
-  (window as any).process = {
-    env: {
-      REACT_APP_SUPABASE_URL: 'https://your-project.supabase.co',
-      REACT_APP_SUPABASE_ANON_KEY: 'your-anon-key',
-      REACT_APP_API_URL: 'http://localhost:3001'
-    }
-  };
-} else if (!process.env || typeof process.env !== 'object') {
-  process.env = {
-    REACT_APP_SUPABASE_URL: 'https://your-project.supabase.co',
-    REACT_APP_SUPABASE_ANON_KEY: 'your-anon-key',
-    REACT_APP_API_URL: 'http://localhost:3001'
-  };
-} else {
-  // Ensure environment variables have fallback values
-  process.env.REACT_APP_SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://your-project.supabase.co';
-  process.env.REACT_APP_SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || 'your-anon-key';
-  process.env.REACT_APP_API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-}
-
-`;
-
-      // Add the declaration at the top if it's a TypeScript file
-      if (filePath.endsWith('.ts') || filePath.endsWith('.tsx')) {
-        processedContent = envVarDeclaration + processedContent;
-      }
-    }
-
-    return processedContent;
-  };
+  const BASE_URL = "http://localhost:8080";
 
   const sandpackConfig = useMemo(() => {
     if (generatedFiles.length === 0) {
@@ -478,91 +383,8 @@ if (typeof process === 'undefined') {
     const importPath = `./${mainFileImportPath.replace(/\.(tsx|ts|js|jsx)$/, '')}`;
 
     const files: SandpackFiles = {
-      '/public/index.html': {
-        code: indexHtml,
-        hidden: true,
-      },
-      '/src/index.tsx': {
-        code: `// Setup environment variables first
-import './setupEnv';
-${createIndexJs(importPath)}`,
-        hidden: true,
-      },
-      '/src/styles.css': {
-        code: defaultStylesCss,
-        hidden: true,
-      },
-      '/tailwind.config.js': {
-        code: `/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: [
-    "./src/**/*.{js,jsx,ts,tsx}",
-    "./public/index.html",
-  ],
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-        },
-        gray: {
-          50: '#f9fafb',
-          100: '#f3f4f6',
-          200: '#e5e7eb',
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
-          600: '#4b5563',
-          700: '#374151',
-          800: '#1f2937',
-          900: '#111827',
-        }
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-      },
-      boxShadow: {
-        'sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-        'DEFAULT': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        'md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-        'lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-        'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-      }
-    },
-  },
-  plugins: [],
-}`,
-        hidden: true,
-      },
-      '/postcss.config.js': {
-        code: `module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}`,
-        hidden: true,
-      },
-      '/src/config/env.ts': {
-        code: `// Environment configuration for preview
-export const config = {
-  SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL || 'https://your-project.supabase.co',
-  SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY || 'your-anon-key',
-  API_URL: process.env.REACT_APP_API_URL || 'http://localhost:3001'
-};
-
-export default config;`,
-        hidden: true,
-      },
+      '/public/index.html': { code: indexHtml, hidden: true },
+      // '/src/index.tsx': { code: createIndexJs(`./${mainFile.path.replace(/\.(tsx|ts|js|jsx)$/, '')}`), hidden: true },
       '/package.json': {
         code: JSON.stringify({
           name: "generated-app",
@@ -845,13 +667,6 @@ export interface UserProfile {
     // Process generated files
     generatedFiles.forEach(file => {
       let cleanPath = file.path;
-
-      // Skip backend files
-      if (cleanPath.includes('backend/') || cleanPath.includes('server.') || cleanPath.includes('api/')) {
-        return;
-      }
-
-      // Normalize path for Sandpack's virtual file system
       if (cleanPath.startsWith('frontend/src/')) {
         cleanPath = `/src/${cleanPath.slice('frontend/src/'.length)}`;
       } else if (cleanPath.startsWith('frontend/public/')) {
@@ -864,11 +679,7 @@ export interface UserProfile {
         // Default to src/ for unknown paths
         cleanPath = `/src/${cleanPath}`;
       }
-
-      // Avoid overwriting essential files
-      if (!cleanPath.includes('index.tsx') && !cleanPath.includes('package.json') && !cleanPath.includes('index.html')) {
-        files[cleanPath] = { code: processFileContent(file.content, cleanPath) };
-      }
+      files[cleanPath] = { code: file.content };
     });
 
     // Enhanced missing modules detection system
@@ -1221,75 +1032,193 @@ export default fallbackFunction;`;
     };
   }, [generatedFiles]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages]);
-
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
-  const BASE_URL = "http://localhost:8080";
-  function parseAIResponse(response: string): GeneratedFile[] {
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const fixPath = (path: string): string => {
+    // Fix common frontend root-level files
+    if (/^(vite\.config\.ts|vite\.config\.js|tsconfig\.json|tailwind\.config\.(js|cjs|ts)|postcss\.config\.(js|cjs)|package\.json|package-lock\.json|index\.html)$/i.test(path)) {
+      return `frontend/${path}`;
+    }
+
+    // Fix common backend root-level files
+    if (/^(requirements\.txt|pyproject\.toml|main\.py|server\.(ts|js))$/i.test(path)) {
+      return `backend/${path}`;
+    }
+
+    return path;
+  };
+
+  const parseAIResponse = (response: string): GeneratedFile[] => {
     const files: GeneratedFile[] = [];
-    // Match markdown headers like #### path/to/file or **path/to/file** followed by a code block
-    const regex = /(?:####\s*(.*?)\s*\n|\*\*(.*?)\*\*\n)```(\w+)?\n([\s\S]*?)```/g;
+    const regex = /####\s*(.*?)\s*\n```(\w+)?\n([\s\S]*?)```/g;
     let match;
 
     while ((match = regex.exec(response)) !== null) {
-      // Capture path from either #### path/to/file or **path/to/file**
-      const rawPath = match[1] ? match[1].trim() : match[2].trim();
-      // Remove leading or trailing single quotes
-      const path = rawPath.replace(/^'|'$/g, '');
-      const content = match[4];
+      const path = match[1].trim().replace(/^'|'$/g, '');
+      const content = match[3].trim();
       if (path && content) {
-        files.push({ path, content: content.trim() });
+        const fixedPath = fixPath(path);
+        files.push({ path: fixedPath, content });
       }
     }
 
-    // Fallback to response.md if no files are parsed
+    // Save non-code markdown sections like "Project Overview", "Folder Structure", etc.
+    const sections = response.split('\n\n---\n').map(section => section.trim());
+    sections.forEach(section => {
+      if (!section.startsWith('## 🔹')) return;
+      const lines = section.split('\n');
+      const title = lines[0].replace('## 🔹 ', '').trim();
+      const content = lines.slice(1).join('\n').trim();
+      if (title !== 'Code Files' && content) {
+        files.push({ path: `${title.toLowerCase().replace(/\s+/g, '-')}.md`, content });
+      }
+    });
+
     if (files.length === 0) {
       files.push({ path: "response.md", content: response });
     }
 
     return files;
-  }
-  const buildFileTree = (files: GeneratedFile[]): FileTreeNode[] => { const root: FileTreeNode = { name: 'root', path: '', type: 'folder', children: [] }; files.forEach(file => { let currentLevel = root; file.path.split('/').forEach((part, index, arr) => { if (!currentLevel.children) return; const isLast = index === arr.length - 1; const existing = currentLevel.children.find(c => c.name === part); if (existing) { currentLevel = existing; } else { const newNode: FileTreeNode = { name: part, path: arr.slice(0, index + 1).join('/'), type: isLast ? 'file' : 'folder', children: isLast ? undefined : [] }; currentLevel.children.push(newNode); currentLevel = newNode; } }); }); return root.children || []; };
+  };
+
+  const buildFileTree = (files: GeneratedFile[]): FileTreeNode[] => {
+    const root: FileTreeNode = { name: 'root', path: '', type: 'folder', children: [] };
+    files.forEach(file => {
+      let currentLevel = root;
+      file.path.split('/').forEach((part, index, arr) => {
+        if (!currentLevel.children) return;
+        const isLast = index === arr.length - 1;
+        let existing = currentLevel.children.find(c => c.name === part);
+        if (existing) {
+          currentLevel = existing;
+        } else {
+          const newNode: FileTreeNode = {
+            name: part,
+            path: arr.slice(0, index + 1).join('/'),
+            type: isLast ? 'file' : 'folder',
+            children: isLast ? undefined : []
+          };
+          currentLevel.children.push(newNode);
+          currentLevel = newNode;
+        }
+      });
+    });
+    return root.children || [];
+  };
+
+  const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+});
+
+  const startConversation = async () => {
+    const loadingToastId = toast.loading("Starting conversation...");
+    try {
+      const res = await fetch(`${BASE_URL}/api/start-conversation`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      console.log(data)
+      setSessionId(data.session_id);
+      setMessages([{ id: Date.now().toString(), type: 'assistant', content: data.message, timestamp: new Date() }]);
+      toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
+      return data.session_id;
+    } catch (err: any) {
+      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+    }
+  };
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
-    if (messageContent.trim().length < 10) return toast.error("Prompt must be at least 10 characters long");
+    
+
     setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
     setInput("");
-    setIsGenerating(true);
-    setGeneratedFiles([]); setFileTree([]); setSelectedFile(null);
-    const loadingToastId = toast.loading("Generating your project...");
+
+    const loadingToastId = toast.loading("Processing your prompt...");
     try {
-      const res = await axios.post(`${BASE_URL}/userpromt`, { Promt: messageContent });
-      if (res.status === 200 && res.data.generatedCode) {
-        const files = parseAIResponse(res.data.generatedCode);
-        if (files.length === 0) {
-          const fallbackFile = { path: "response.md", content: res.data.generatedCode };
-          setGeneratedFiles([fallbackFile]);
-          setFileTree([{ name: "response.md", path: "response.md", type: 'file', children: undefined }])
-          setSelectedFile(fallbackFile);
-        } else {
+      let sessionid;
+    
+      if (!sessionId) {
+        sessionid = await startConversation();
+        localStorage.setItem("sessionid", sessionid)
+      }
+      console.log(sessionid)
+      const res = await fetch(`${BASE_URL}/refine`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
+      });
+    
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
+      toast.update(loadingToastId, { render: "Response received!", type: "success", isLoading: false, autoClose: 2000 });
+    } catch (err: any) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
+      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+    }
+  };
+
+  const handleGenerateCode = async () => {
+    const sessionid = localStorage.getItem("sessionid");
+    if (!sessionid) {
+      toast.error("No active conversation session");
+      return;
+    }
+
+    setIsGenerating(true);
+    setGeneratedFiles([]);
+    setFileTree([]);
+    setSelectedFile(null);
+
+    const loadingToastId = toast.loading("Generating code...");
+
+    try {
+      const response = await fetch(`http://localhost:8000/generate`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ session_id: sessionid }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      let responseText = "";
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader available");
+
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        responseText += chunk;
+
+        const files = parseAIResponse(responseText);
+        if (files.length > 0) {
           setGeneratedFiles(files);
           const tree = buildFileTree(files);
           setFileTree(tree);
-          setSelectedFile(files[0]);
+          if (!selectedFile) setSelectedFile(files[0]);
           const rootFolders = new Set(tree.filter(n => n.type === 'folder').map(n => n.path));
           setExpandedFolders(rootFolders);
         }
-        toast.update(loadingToastId, { render: "Success!", type: "success", isLoading: false, autoClose: 2000 });
-      } else { throw new Error("Invalid response from server"); }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message :
-        err && typeof err === 'object' && 'response' in err ?
-          (err as { response?: { data?: { error?: string } } }).response?.data?.error || "Server error" :
-          "An unknown error occurred.";
-      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${errorMessage}`, timestamp: new Date() }]);
-      toast.update(loadingToastId, { render: `Error: ${errorMessage}`, type: "error", isLoading: false, autoClose: 4000 });
+      }
+
+      toast.update(loadingToastId, { render: "Code generated!", type: "success", isLoading: false, autoClose: 2000 });
+    } catch (err: any) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
+      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     } finally {
       setIsGenerating(false);
     }
@@ -1303,10 +1232,32 @@ export default fallbackFunction;`;
     }
   };
 
-  const handleQuickAction = (action: string) => { handleSend(`Create a ${action}`) };
-  const copyCode = () => { if (selectedFile) navigator.clipboard.writeText(selectedFile.content).then(() => toast.success("Copied!")) };
-  const downloadZip = async () => { if (generatedFiles.length === 0) return; const zip = new JSZip(); generatedFiles.forEach(f => zip.file(f.path, f.content)); const blob = await zip.generateAsync({ type: 'blob' }); saveAs(blob, "studai-project.zip") };
-  const toggleFolder = (path: string) => { setExpandedFolders(prev => { const next = new Set(prev); if (next.has(path)) next.delete(path); else next.add(path); return next }) };
+  const handleQuickAction = (action: string) => {
+    startConversation().then(() => handleSend(`Create a ${action}`));
+  };
+
+  const copyCode = () => {
+    if (selectedFile) {
+      navigator.clipboard.writeText(selectedFile.content).then(() => toast.success("Copied!"));
+    }
+  };
+
+  const downloadZip = async () => {
+    if (generatedFiles.length === 0) return;
+    const zip = new JSZip();
+    generatedFiles.forEach(f => zip.file(f.path, f.content));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    saveAs(blob, "studai-project.zip");
+  };
+
+  const toggleFolder = (path: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
 
   const openInCodeSandbox = () => {
     if (!sandpackConfig.files || Object.keys(sandpackConfig.files).length === 0) return;
@@ -1348,25 +1299,42 @@ export default fallbackFunction;`;
   };
 
   const FileTreeItem = ({ node, level = 0 }: { node: FileTreeNode; level?: number }) => {
-    const isExpanded = expandedFolders.has(node.path)
-    const isSelected = selectedFile?.path === node.path
-    const handleNodeClick = () => { if (node.type === 'folder') toggleFolder(node.path); else setSelectedFile(generatedFiles.find(f => f.path === node.path) || null) }
+    const isExpanded = expandedFolders.has(node.path);
+    const isSelected = selectedFile?.path === node.path;
+    const handleNodeClick = () => {
+      if (node.type === 'folder') toggleFolder(node.path);
+      else setSelectedFile(generatedFiles.find(f => f.path === node.path) || null);
+    };
     return (
       <div>
-        <div onClick={handleNodeClick} className={`flex items-center space-x-2 py-1 px-2 hover:bg-muted/50 cursor-pointer rounded text-sm ${isSelected ? "bg-primary/10 text-primary" : ""}`} style={{ paddingLeft: `${level * 12 + 8}px` }}>
+        <div
+          onClick={handleNodeClick}
+          className={`flex items-center space-x-2 py-1 px-2 hover:bg-muted/50 cursor-pointer rounded text-sm ${isSelected ? "bg-primary/10 text-primary" : ""}`}
+          style={{ paddingLeft: `${level * 12 + 8}px` }}
+        >
           {node.type === "folder" ? (isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />) : <div className="w-4" />}
           {node.type === "folder" ? (isExpanded ? <FolderOpen className="h-4 w-4 text-blue-500" /> : <Folder className="h-4 w-4 text-blue-500" />) : <FileIcon className="h-4 w-4 text-muted-foreground" />}
           <span>{node.name}</span>
         </div>
-        {isExpanded && node.children && (<div>{node.children.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name)).map(child => <FileTreeItem key={child.path} node={child} level={level + 1} />)}</div>)}
+        {isExpanded && node.children && (
+          <div>{node.children.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name)).map(child => <FileTreeItem key={child.path} node={child} level={level + 1} />)}</div>
+        )}
       </div>
-    )
-  }
+    );
+  };
 
-  const headerUser = user ? { name: user.fullName, email: user.email, avatar: "/placeholder.svg?height=32&width=32", } : null;
+  const headerUser = user ? { name: user.fullName, email: user.email, avatar: "/placeholder.svg?height=32&width=32" } : null;
   const getLanguage = (filePath: string) => {
     const extension = filePath.split('.').pop();
-    switch (extension) { case 'js': case 'jsx': return 'javascript'; case 'ts': case 'tsx': return 'typescript'; case 'css': return 'css'; case 'html': return 'html'; case 'json': return 'json'; case 'md': return 'markdown'; default: return 'plaintext'; }
+    switch (extension) {
+      case 'js': case 'jsx': return 'javascript';
+      case 'ts': case 'tsx': return 'typescript';
+      case 'css': return 'css';
+      case 'html': return 'html';
+      case 'json': return 'json';
+      case 'md': return 'markdown';
+      default: return 'plaintext';
+    }
   };
 
   return (
@@ -1382,8 +1350,65 @@ export default fallbackFunction;`;
           <ScrollArea className="h-full">
             <div className="container mx-auto px-4 py-8">
               <div className="max-w-4xl mx-auto">
-                <div className="text-center mb-12"><h1 className="text-4xl md:text-5xl font-bold mb-6">What can I help you build?</h1><div className="max-w-2xl mx-auto mb-8"><div className="relative"><Textarea placeholder="Ask to build a React component with a file structure..." value={input} onChange={(e) => setInput(e.target.value)} className="min-h-[120px] text-lg resize-none pr-12" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} /><Button size="icon" className="absolute bottom-3 right-3" onClick={() => handleSend()} disabled={!input.trim() || isGenerating}>{isGenerating ? <Sparkles className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div></div><div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-12">{quickActions.map((action) => (<Button key={action.label} variant="outline" className="h-auto p-4 flex flex-col items-start text-left space-y-2 hover:bg-muted/50 bg-transparent" onClick={() => handleQuickAction(action.label)}><action.icon className="h-5 w-5 mb-2" /><div><div className="font-medium text-sm">{action.label}</div><div className="text-xs text-muted-foreground">{action.description}</div></div></Button>))}</div></div>
-                <div className="mb-12"><h2 className="text-2xl font-bold mb-4">Starter Templates</h2><div className="grid md:grid-cols-4 gap-4">{starterTemplates.map((template) => (<Card key={template.name} className="cursor-pointer hover:shadow-lg transition-shadow"><CardContent className="p-6"><div className={`w-12 h-12 rounded-lg ${template.color} flex items-center justify-center text-2xl mb-4`}>{template.icon}</div><h3 className="font-semibold mb-2">{template.name}</h3><p className="text-sm text-muted-foreground">{template.description}</p></CardContent></Card>))}</div></div>
+                <div className="text-center mb-12">
+                  <h1 className="text-4xl md:text-5xl font-bold mb-6">What can I help you build?</h1>
+                  <div className="max-w-2xl mx-auto mb-8">
+                    <div className="relative">
+                      <Textarea
+                        placeholder="Ask to build a React component with a file structure..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        className="min-h-[120px] text-lg resize-none pr-12"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                          }
+                        }}
+                      />
+                      <Button
+                        size="icon"
+                        className="absolute bottom-3 right-3"
+                        onClick={() => handleSend()}
+                        disabled={!input.trim() || isGenerating}
+                      >
+                        {isGenerating ? <Sparkles className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-12">
+                    {quickActions.map((action) => (
+                      <Button
+                        key={action.label}
+                        variant="outline"
+                        className="h-auto p-4 flex flex-col items-start text-left space-y-2 hover:bg-muted/50 bg-transparent"
+                        onClick={() => handleQuickAction(action.label)}
+                      >
+                        <action.icon className="h-5 w-5 mb-2" />
+                        <div>
+                          <div className="font-medium text-sm">{action.label}</div>
+                          <div className="text-xs text-muted-foreground">{action.description}</div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mb-12">
+                  <h2 className="text-2xl font-bold mb-4">Starter Templates</h2>
+                  <div className="grid md:grid-cols-4 gap-4">
+                    {starterTemplates.map((template) => (
+                      <Card key={template.name} className="cursor-pointer hover:shadow-lg transition-shadow">
+                        <CardContent className="p-6">
+                          <div className={`w-12 h-12 rounded-lg ${template.color} flex items-center justify-center text-2xl mb-4`}>
+                            {template.icon}
+                          </div>
+                          <h3 className="font-semibold mb-2">{template.name}</h3>
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </ScrollArea>
@@ -1391,11 +1416,67 @@ export default fallbackFunction;`;
           <ResizablePanelGroup direction="horizontal" className="h-full w-full">
             <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
               <div className="h-full flex flex-col">
-                <div className="border-b p-4 flex-shrink-0"><h2 className="font-semibold flex items-center"><Sparkles className="mr-2 h-5 w-5 text-primary" />AI Assistant</h2></div>
+                <div className="border-b p-4 flex-shrink-0">
+                  <h2 className="font-semibold flex items-center">
+                    <Sparkles className="mr-2 h-5 w-5 text-primary" />AI Assistant
+                  </h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={handleGenerateCode}
+                    disabled={isGenerating || !sessionId}
+                  >
+                    Generate Code
+                  </Button>
+                </div>
                 <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-6">{messages.map((message) => (<div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[80%] rounded-lg p-4 ${message.type === "user" ? "bg-primary text-primary-foreground" : message.type === "error" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"}`}><p className="whitespace-pre-wrap">{message.content}</p><div className="text-xs opacity-70 mt-2">{message.timestamp.toLocaleTimeString()}</div></div></div>))}{isGenerating && (<div className="flex justify-start"><div className="bg-muted text-muted-foreground rounded-lg p-4"><div className="flex items-center space-x-2"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div><span>Generating...</span></div></div></div>)}</div><div ref={messagesEndRef} />
+                  <div className="p-4 space-y-6">
+                    {messages.map((message) => (
+                      <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[80%] rounded-lg p-4 ${message.type === "user" ? "bg-primary text-primary-foreground" : message.type === "error" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"}`}>
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                          <div className="text-xs opacity-70 mt-2">{message.timestamp.toLocaleTimeString()}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {isGenerating && (
+                      <div className="flex justify-start">
+                        <div className="bg-muted text-muted-foreground rounded-lg p-4">
+                          <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                            <span>Generating...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div ref={messagesEndRef} />
                 </ScrollArea>
-                <div className="border-t p-4 flex-shrink-0"><div className="relative"><Textarea placeholder="Describe what to build or modify..." value={input} onChange={(e) => setInput(e.target.value)} className="min-h-[60px] resize-none pr-12" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} /><Button size="icon" className="absolute bottom-3 right-3" onClick={() => handleSend()} disabled={!input.trim() || isGenerating}><Send className="h-4 w-4" /></Button></div></div>
+                <div className="border-t p-4 flex-shrink-0">
+                  <div className="relative">
+                    <Textarea
+                      placeholder="Describe what to build or modify..."
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      className="min-h-[60px] resize-none pr-12"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                    />
+                    <Button
+                      size="icon"
+                      className="absolute bottom-3 right-3"
+                      onClick={() => handleSend()}
+                      disabled={!input.trim() || isGenerating}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </ResizablePanel>
 
@@ -1430,7 +1511,14 @@ export default fallbackFunction;`;
                         <div className="h-full border-r bg-muted/20 flex flex-col">
                           <div className="p-2 border-b flex-shrink-0"><h3 className="font-semibold text-sm">File Explorer</h3></div>
                           <ScrollArea className="flex-1 p-2">
-                            {fileTree.length > 0 ? (<div className="space-y-1">{fileTree.map((node) => (<FileTreeItem key={node.path} node={node} />))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm"><Folder className="h-8 w-8 mx-auto mb-2 opacity-50" /><p>Awaiting generation...</p></div>)}
+                            {fileTree.length > 0 ? (
+                              <div className="space-y-1">{fileTree.map((node) => (<FileTreeItem key={node.path} node={node} />))}</div>
+                            ) : (
+                              <div className="text-center py-8 text-muted-foreground text-sm">
+                                <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p>Awaiting generation...</p>
+                              </div>
+                            )}
                           </ScrollArea>
                         </div>
                       </ResizablePanel>
@@ -1443,88 +1531,37 @@ export default fallbackFunction;`;
                             value={selectedFile?.content ?? "// Select a file to view and edit its content"}
                             theme={theme === 'dark' ? 'vs-dark' : 'light'}
                             onChange={handleCodeEdit}
-                            options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14, scrollBeyondLastLine: false, }}
+                            options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14, scrollBeyondLastLine: false }}
                           />
                         </div>
                       </ResizablePanel>
                     </ResizablePanelGroup>
                   </TabsContent>
 
-                  <TabsContent value="preview" className="flex-1 p-0 m-0 h-full">
-                    {selectedTab === 'preview' && sandpackConfig.files && Object.keys(sandpackConfig.files).length > 0 && (
-                      <div className="h-full w-full">
-                        <SandpackProvider
-                          files={sandpackConfig.files}
-                          template="react-ts"
-                          customSetup={{
-                            dependencies: {
-                              'react': "^18.2.0",
-                              "react-dom": "^18.2.0",
-                              "react-router-dom": "^6.22.3",
-                              "@types/react": "^18.2.0",
-                              "@types/react-dom": "^18.2.0",
-                              "typescript": "^5.0.0",
-                              "zustand": "^4.4.0",
-                              "@supabase/supabase-js": "^2.38.0",
-                              "axios": "^1.6.0",
-                              "lucide-react": "^0.294.0",
-                              "@radix-ui/react-dialog": "^1.0.5",
-                              "@radix-ui/react-dropdown-menu": "^2.0.6",
-                              "@radix-ui/react-toast": "^1.1.5",
-                              "class-variance-authority": "^0.7.0",
-                              "clsx": "^2.0.0",
-                              "tailwind-merge": "^2.0.0",
-                              "tailwindcss": "^3.4.1",
-                              "autoprefixer": "^10.4.16",
-                              "postcss": "^8.4.32"
-                            },
-                            devDependencies: {
-                              "@types/node": "^20.0.0",
-                              "postcss": "^8.4.32",
-                              "tailwindcss": "^3.4.1",
-                              "autoprefixer": "^10.4.16"
-                            }
-                          }}
-                          options={{
-                            visibleFiles: sandpackConfig.main ? [sandpackConfig.main] : [],
-                            activeFile: sandpackConfig.main,
-                            recompileMode: "delayed",
-                            recompileDelay: 300,
-                            autorun: true,
-                            autoReload: true
-                          }}
-                        >
-                          <SandpackLayout className="h-[900px] ">
-                              <SandpackFileExplorer className="h-[900px]"
-                                style={{ height: "850px" }}
-                              />
-                            <SandpackCodeEditor
-                              showTabs={true}
-                              showLineNumbers={true}
-                              showInlineErrors={true}
-                              wrapContent={true}
-                                className="h-[900px] w-[100px]"
-                                style={{ height: "850px" }}
-                            />
-                            <SandpackPreview
-                              showOpenInCodeSandbox={true}
-                              showRefreshButton={true}
-                              showOpenNewtab={true}
-                                className=" w-[60%]"
-                              style={{ height:"850px"}}
-                            />
-                          </SandpackLayout>
-                        </SandpackProvider>
-                      </div>
-                    )}
-                    {selectedTab === 'preview' && (!sandpackConfig.files || Object.keys(sandpackConfig.files).length === 0) && (
-                      <div className="flex items-center justify-center h-full w-full">
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg font-medium mb-2">No Preview Available</p>
-                          <p className="text-sm">Generate some code first to see the preview</p>
-                        </div>
-                      </div>
+                  <TabsContent value="preview" className="flex-1 p-0 m-0">
+                    {selectedTab === 'preview' && (
+                      <SandpackProvider
+                        files={sandpackConfig.files}
+                        template="react-ts"
+                        customSetup={{
+                          entry: sandpackConfig.entry,
+                          dependencies: {
+                            'react': "^18.2.0",
+                            "react-dom": "^18.2.0",
+                            "react-router-dom": "^6.22.3",
+                            'tailwindcss': "^3.4.1",
+                            'axios': "^1.11.0",
+                            "react-icons": "^5.5.0",
+                            "zustand": "^5.0.0",
+                            "date-fns":"^1.0.0"
+                          }
+                        }}
+                      >
+                        <SandpackLayout style={{height:"800px"}}>
+                            <SandpackCodeEditor style={{ height: "800px" }} />
+                            <SandpackPreview style={{ height: "800px" }} />
+                        </SandpackLayout>
+                      </SandpackProvider>
                     )}
                   </TabsContent>
                 </Tabs>
@@ -1534,5 +1571,5 @@ export default fallbackFunction;`;
         )}
       </main>
     </div>
-  )
-} 
+  );
+}

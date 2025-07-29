@@ -1,34 +1,28 @@
-"""
-StudAI Works - AI Service
-FastAPI service for code generation using Azure OpenAI (GPT-4 Turbo)
-"""
-
+# file: src/fastapi/main.py
+import os
+import copy
+import asyncio
+import logging
+import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from typing import Optional
-from openai import AzureOpenAI
-import os
-import logging
-import time
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from openai import AsyncAzureOpenAI, RateLimitError
+from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
 
-# Load environment variables
+# --- Setup & Configuration ---
 load_dotenv()
-
-# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI app
 app = FastAPI(
-    title="StudAI Works - AI Service",
-    description="AI-powered code generation service using Azure OpenAI",
-    version="3.0.0"
+    title="StudAI Works - Conversational AI Coder",
+    description="A conversational service to first refine features and then generate code.",
+    version="5.0.0"
 )
 
-# CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,115 +31,67 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Azure OpenAI Config
-AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
-
-if not all([AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT_NAME, AZURE_OPENAI_API_VERSION]):
-    raise ValueError("Missing Azure OpenAI configuration in environment variables")
-
-# Initialize Azure OpenAI client
-client = AzureOpenAI(
-    api_key=AZURE_OPENAI_KEY,
-    api_version=AZURE_OPENAI_API_VERSION,
-    azure_endpoint=AZURE_OPENAI_ENDPOINT
+# --- AI Client Setup ---
+client = AsyncAzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_KEY"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
 )
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-# Rate limiting tokens (1M/min)
-MAX_TOKENS_PER_MIN = 1_000_000
-tokens_used = 0
-token_window_start = time.time()
+# --- In-Memory Session Storage ---
+CONVERSATION_SESSIONS = {}
 
-def throttle_tokens(estimated_tokens: int):
-    global tokens_used, token_window_start
-    now = time.time()
-    if now - token_window_start > 60:
-        tokens_used = 0
-        token_window_start = now
-    tokens_used += estimated_tokens
-    if tokens_used > MAX_TOKENS_PER_MIN:
-        sleep_time = 60 - (now - token_window_start)
-        logger.warning(f"Throttling: sleeping for {sleep_time:.2f}s")
-        time.sleep(sleep_time)
-        tokens_used = estimated_tokens
-        token_window_start = time.time()
+# CONVERSATION_REFINEMENT: Dict[str, List[Dict[str, str]]] = {}
+# CONVERSATION_GENERATION: Dict[str, List[Dict[str, str]]] = {}
 
-def get_completion_with_continuation(user_input: str, section_prompt: str, previous_response: str = "") -> str:
-    messages = [
-        {"role": "system", "content": "You are an expert software developer with a focus on clean, production-ready code."},
-        {"role": "user", "content": section_prompt if not previous_response else f"{previous_response}\n[CONTINUE]"}
-    ]
-    response = client.chat.completions.create(
-        model=AZURE_OPENAI_DEPLOYMENT_NAME,
-        messages=messages,
-        temperature=0.3,
-        max_tokens=8192,
-        top_p=0.9,
-        frequency_penalty=0.1,
-        presence_penalty=0.1
-    )
-    return response.choices[0].message.content
+# --- Pydantic Models ---
+class ConversationRequest(BaseModel):
+    session_id: str
+    message: str
+
+class ConversationResponse(BaseModel):
+    reply: str
+    session_id: str
 
 class GenerateRequest(BaseModel):
-    userInput: str
+    session_id: str
 
-class GenerateResponse(BaseModel):
-    generatedPrompt: str
-    generatedCode: str
+class StartResponse(BaseModel):
+    session_id: str
+    message: str
 
-def create_base_prompt(user_input: str) -> str:
-    return f"""
-You are an expert Full-Stack Developer and Prompt Engineer with 25+ years of experience.
+# --- System Prompts ---
+REFINEMENT_SYSTEM_PROMPT = """
+You are a friendly and brilliant project manager. Your goal is to talk to the user and help them clarify the features for a web application they want to build. Ask clarifying questions, suggest features, and help them create a solid plan. Keep your responses concise and guide the conversation forward. Once you feel the plan is clear, confirm with the user if they are ready to generate the code. Keep in mind that this is for a future prompt.
+"""
 
-Your task is to generate **production-grade, modular, scalable, and well-documented** code for a full-stack web application described below.
+CODE_GEN_SYSTEM_PROMPT = """
+You are an expert Full-Stack Developer with 25+ years of experience. Your task is to generate a complete, production-grade, and well-documented web application based on the provided conversation history.
 
----
+The user and a project manager have already discussed the features. Your job is to read their entire conversation and build the application exactly as specified.
+###You need to use CSS not tailwind and also you need to generate it inside the index.css file not in any other files and the website modren look like a webiste that goning to come look beautiful and naturally with that much styles and animations and make sure one more time everyting importted perfectly tis is very important
 
-🧾 **User Request**: "{user_input}"
+### prefix the code without this error Something went wrong
 
----
+/src/store/useAppStore.ts: (0 , _zustand.default) is not a function (80:38)
 
+   updateNotification: (n: Notification) => void;
+  | }
+  | 
+>  | const useAppStore = create<AppState>((set) => ({
+                                             ^
+   |   currentScreen: 'dashboard',
+  |   setCurrentScreen: (screen) => set({ currentScreen: screen }),
+  | 
 ### 🔧 Tech Stack
-- **Frontend**: React (TypeScript) + Tailwind CSS + Vite + React Router + Zustand
-- **Backend**: Express.js (TypeScript) + Node.js + Supabase
-- **Database**: Supabase (PostgreSQL)
-- **State Management**: Zustand
-- **Authentication**: Supabase Auth + JWT
-- **Styling**: Tailwind CSS
-- **Build Tool**: Vite
+- Frontend: React (TypeScript) + CSS + Vite (Unless specified otherwise in history)
+- make sure to include all necessary files to be able to download and run this project like index.html or index.tsx etc
+- Backend: Something compatible with react
+- State Management: Zustand
 
----
-
-### 📋 Project Requirements
-- Write clean, modular, DRY code using best practices (e.g., SOLID principles)
-- Include detailed inline comments and proper TypeScript types
-- Provide a complete and runnable folder/file structure
-- Ensure ALL imports work correctly (no missing files or broken paths)
-- Include complete configuration files:
-  - Frontend: `package.json`, `vite.config.ts`, `index.html`, `tailwind.config.js`, `tsconfig.json`, `.env.example`
-  - Backend: `package.json`, `tsconfig.json`, `.env.example`
-- Make sure all environment variables are properly handled using:
-  - Frontend: `import.meta.env.VITE_VARIABLE_NAME`
-  - Backend: `process.env.VARIABLE_NAME`
-- Include comprehensive `README.md` with step-by-step setup instructions
-- All React Router paths should work correctly
-- Proper error handling and loading states
-- Responsive design with Tailwind CSS
-
----
-
-### 📂 Output Format (Strict Markdown Format)
-Follow this exact format so the code can be parsed correctly:
-
-1. ✅ **Project Overview**: Describe app purpose, features, architecture, and data flow
-2. 📁 **Folder Structure**: Complete markdown tree format showing frontend/ and backend/ folders
-3. 🔢 **Frontend Code**: All React TypeScript components, hooks, stores, and config files
-4. 🔢 **Backend Code**: Express.js TypeScript API, middleware, routes, and Supabase integration
-5. 🚀 **Setup Instructions**: Complete step-by-step guide for both frontend and backend
-6. 📝 **Notes**: Environment variables, assumptions, and optional improvements
-
+### 📂 Output Format (Strict markdown Format)
+Follow this exact format for parsing. For each step, generate ONLY the content for that step.
 Use markdown headers like:
 ```
 #### frontend/src/App.tsx
@@ -157,108 +103,114 @@ Use markdown headers like:
 ```typescript
 // code here
 ```
-
+> All frontend-related files (e.g., `vite.config.ts`, `tsconfig.json`, `tailwind.config.cjs`, `index.html`, `package.json`) must be under the `frontend/` folder.  
+> All backend files (e.g., `requirements.txt`, `main.py`, `pyproject.toml`) must be under the `backend/` folder.  
+> No files should exist at the project root except the `README.md`.
 ---
 
-### 🛑 Critical Requirements for Environment Variables
-- Use `import.meta.env.VITE_SUPABASE_URL` and `import.meta.env.VITE_SUPABASE_ANON_KEY` for frontend
-- Create proper `.env.example` files with all required variables
-- Include environment variable setup in README
-- Handle missing environment variables gracefully with fallbacks or clear error messages
+1.  **Project Overview**: A high-level description based on the conversation.
+2.  **Folder Structure**: A markdown tree.
+3.  **Code Files**: All frontend and backend code. Use markdown headers for each file path (e.g., `#### path/to/file.ext`).
+4.  **README.md**: Complete setup and run instructions.
+"""
 
----
-
-### 🛑 Large Output Instructions
-If output exceeds token limit:
-- End with `[CONTINUE]`
-- In the next response, **resume exactly where you stopped** — don't repeat completed sections
-
----
-
-Generate the complete full-stack application for: **"{user_input}"**
-
-Make sure to create a fully functional project that can be immediately run after following the setup instructions.
-    """
-
-# Section prompts
-SECTION_PROMPTS = {
-    "overview": "Start with Part 1 - ✅ Project Overview. Describe the purpose, features, and architecture of the app based on the user's request.",
-    "structure": "Generate Part 2 - 📁 Folder Structure in markdown tree format showing both frontend/ and backend/ directories.",
-    "frontend": "Generate Part 3 - 🔢 Frontend Code: All React TypeScript components, hooks, Zustand stores, Tailwind CSS, and Vite configuration files.",
-    "backend": "Generate Part 4 - 🔢 Backend Code: Express.js TypeScript server, API routes, middleware, Supabase integration, and authentication.",
-    "setup": "Generate Part 5 - 🚀 Setup Instructions for installing dependencies, configuring environment variables, setting up Supabase, and running both frontend and backend.",
-    "notes": "Generate Part 6 - 📝 Notes about environment variables, Supabase configuration, assumptions, limitations, and optional improvements."
+CODE_GEN_PLAN = {
+    "Project Overview": "First, provide the 'Project Overview'. Summarize the app's features based on the entire conversation history.",
+    "Folder Structure": "Next, generate the complete 'Folder Structure' in a markdown tree format.",
+    "Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header as well as make sure to include all files like index etc so that no import fails as well as make sure of having all necessary libraries in the package.json for frontend.",
+    "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme",
+    "Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
 }
 
+# --- API Endpoints ---
 @app.get("/")
 async def root():
-    return {"message": "StudAI Works Azure AI Service is running!", "status": "healthy"}
+    return {"message": "Conversational AI Coder is running!", "status": "healthy"}
 
-@app.get("/health")
-@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-async def health_check():
+@app.post("/start-conversation", response_model=StartResponse)
+async def start_conversation():
+    session_id = str(uuid.uuid4())
+    initial_message = "Hello! I'm here to help you plan your web application. What are you thinking of building today?"
+    CONVERSATION_SESSIONS[session_id] = [
+        {"role": "system", "content": REFINEMENT_SYSTEM_PROMPT},
+        {"role": "assistant", "content": initial_message}
+    ]
+    logger.info(f"New conversation started: {session_id}")
+    return StartResponse(session_id=session_id, message=initial_message)
+
+@app.post("/refine", response_model=ConversationResponse)
+async def refine_features(request: ConversationRequest):
+    if request.session_id not in CONVERSATION_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    
+    history = CONVERSATION_SESSIONS[request.session_id]
+    history.append({"role": "user", "content": request.message})
+
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=AZURE_OPENAI_DEPLOYMENT_NAME,
-            messages=[{"role": "user", "content": "Ping"}],
-            max_tokens=10
+            messages=history,
+            temperature=0.7,
+            max_tokens=2000,
         )
-        return {"status": "healthy", "service": "Azure OpenAI connected"}
+        reply = response.choices[0].message.content
+        history.append({"role": "assistant", "content": reply})
+        CONVERSATION_SESSIONS[request.session_id] = history
+        return ConversationResponse(reply=reply, session_id=request.session_id)
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail="Azure OpenAI connection failed")
+        logger.error(f"Error during refinement: {e}")
+        raise HTTPException(status_code=500, detail="AI conversation failed.")
 
-@app.post("/generate", response_model=GenerateResponse)
-@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+@retry(
+    wait=wait_random_exponential(min=1, max=20),
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type(RateLimitError)
+)
+# New function: Non-streamed generation
+async def run_code_generation(request: GenerateRequest) -> str:
+    if request.session_id not in CONVERSATION_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found to generate code from.")
+
+    conversation_history = copy.deepcopy(CONVERSATION_SESSIONS[request.session_id])
+
+    messages = [
+        {"role": "system", "content": CODE_GEN_SYSTEM_PROMPT},
+        {"role": "user", "content": "Here is the full conversation history. Please generate the application based on this.\n\n" + "\n".join([f"{m['role']}: {m['content']}" for m in conversation_history if m['role'] != 'system'])}
+    ]
+
+    full_output = ""
+    try:
+        for section_title, section_task in CODE_GEN_PLAN.items():
+            messages.append({"role": "user", "content": section_task})
+
+            response = await client.chat.completions.create(
+                model=AZURE_OPENAI_DEPLOYMENT_NAME,
+                messages=messages,
+                temperature=0.2,
+                max_tokens=10192,
+            )
+
+            section_response = response.choices[0].message.content
+            messages.append({"role": "assistant", "content": section_response})
+
+            full_output += f"\n\n---\n## 🔹 {section_title}\n\n{section_response}"
+
+    except Exception as e:
+        logger.error(f"Error during generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error during code generation: {str(e)}")
+
+    return full_output
+
+
+# Final API endpoint
+@app.post("/generate")
 async def generate_code(request: GenerateRequest):
     try:
-        if not request.userInput or len(request.userInput.strip()) < 10:
-            raise HTTPException(status_code=400, detail="Input too short")
-
-        base_prompt = create_base_prompt(request.userInput)
-        full_response = ""
-
-        for section_name, section_task in SECTION_PROMPTS.items():
-            logger.info(f"🔧 Generating section: {section_name}")
-            section_prompt = f"{base_prompt}\n\n{section_task}"
-            section_response = get_completion_with_continuation(request.userInput, section_prompt)
-
-            while "[CONTINUE]" in section_response:
-                logger.info(f"⏭ Continuing section: {section_name}")
-                next_chunk = get_completion_with_continuation(request.userInput, section_prompt, section_response)
-                section_response = section_response.replace("[CONTINUE]", "") + next_chunk
-
-            throttle_tokens(len(section_response) // 4)
-            full_response += f"\n\n---\n### 🔹 {section_name.capitalize()}\n\n{section_response.strip()}"
-
-        return GenerateResponse(
-            generatedPrompt=base_prompt.strip(),
-            generatedCode=full_response.strip()
-        )
-
+        full_output = await run_code_generation(request)
+        return Response(content=full_output, media_type='text/markdown')
     except Exception as e:
-        logger.error(f"❌ Error in /generate: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
-
-@app.post("/generate-simple")
-@retry(retry=retry_if_exception_type(Exception), stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-async def generate_simple(request: GenerateRequest):
-    try:
-        simple_prompt = f"Create a simple web app for: {request.userInput}"
-        completion = client.chat.completions.create(
-            model=AZURE_OPENAI_DEPLOYMENT_NAME,
-            messages=[{"role": "user", "content": simple_prompt}],
-            temperature=0.5,
-            max_tokens=2048
-        )
-        return {
-            "userInput": request.userInput,
-            "generatedCode": completion.choices[0].message.content,
-            "prompt": simple_prompt
-        }
-    except Exception as e:
-        logger.error(f"Error in /generate-simple: {str(e)}")
-        raise HTTPException(status_code=500, detail="Simple generation failed")
+        logger.error(f"Error during generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
