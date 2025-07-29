@@ -62,14 +62,14 @@ const starterTemplates = [
 const indexHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><title>React Preview</title></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>`;
 
 // Dynamically created index.js content
-const createIndexJs = (mainFilePath: string) => `import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from '${mainFilePath}';
-import './styles.css';
+// const createIndexJs = (mainFilePath: string) => `import React from 'react';
+// import { createRoot } from 'react-dom/client';
+// import App from '${mainFilePath}';
+// import './styles.css';
 
-const container = document.getElementById('root');
-const root = createRoot(container);
-root.render(<React.StrictMode><App /></React.StrictMode>);`;
+// const container = document.getElementById('root');
+// const root = createRoot(container);
+// root.render(<React.StrictMode><App /></React.StrictMode>);`;
 
 const defaultStylesCss = `body { font-family: sans-serif; }`;
 
@@ -106,7 +106,7 @@ export default function GeneratePage() {
 
     const files: SandpackFiles = {
       '/public/index.html': { code: indexHtml, hidden: true },
-      '/src/index.tsx': { code: createIndexJs(`./${mainFile.path.replace(/\.(tsx|ts|js|jsx)$/, '')}`), hidden: true },
+      // '/src/index.tsx': { code: createIndexJs(`./${mainFile.path.replace(/\.(tsx|ts|js|jsx)$/, '')}`), hidden: true },
       '/package.json': {
         code: JSON.stringify({
           dependencies: {
@@ -617,13 +617,15 @@ export default function GeneratePage() {
                             "react-router-dom": "^6.22.3",
                             'tailwindcss': "^3.4.1",
                             'axios': "^1.11.0",
-                            "react-icons": "^5.5.0"
+                            "react-icons": "^5.5.0",
+                            "zustand": "^5.0.0",
+                            "date-fns":"^1.0.0"
                           }
                         }}
                       >
-                        <SandpackLayout>
-                          <SandpackCodeEditor />
-                          <SandpackPreview />
+                        <SandpackLayout style={{height:"800px"}}>
+                            <SandpackCodeEditor style={{ height: "800px" }} />
+                            <SandpackPreview style={{ height: "800px" }} />
                         </SandpackLayout>
                       </SandpackProvider>
                     )}

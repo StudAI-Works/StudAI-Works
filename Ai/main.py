@@ -70,9 +70,22 @@ CODE_GEN_SYSTEM_PROMPT = """
 You are an expert Full-Stack Developer with 25+ years of experience. Your task is to generate a complete, production-grade, and well-documented web application based on the provided conversation history.
 
 The user and a project manager have already discussed the features. Your job is to read their entire conversation and build the application exactly as specified.
+###You need to use CSS not tailwind and also you need to generate it inside the index.css file not in any other files and the website modren look like a webiste that goning to come look beautiful and naturally with that much styles and animations and make sure one more time everyting importted perfectly tis is very important
 
+### prefix the code without this error Something went wrong
+
+/src/store/useAppStore.ts: (0 , _zustand.default) is not a function (80:38)
+
+   updateNotification: (n: Notification) => void;
+  | }
+  | 
+>  | const useAppStore = create<AppState>((set) => ({
+                                             ^
+   |   currentScreen: 'dashboard',
+  |   setCurrentScreen: (screen) => set({ currentScreen: screen }),
+  | 
 ### 🔧 Tech Stack
-- Frontend: React (TypeScript) + Tailwind CSS + Vite (Unless specified otherwise in history)
+- Frontend: React (TypeScript) + CSS + Vite (Unless specified otherwise in history)
 - make sure to include all necessary files to be able to download and run this project like index.html or index.tsx etc
 - Backend: Something compatible with react
 - State Management: Zustand
