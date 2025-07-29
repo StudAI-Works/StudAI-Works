@@ -154,6 +154,20 @@ export default function GeneratePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const fixPath = (path: string): string => {
+    // Fix common frontend root-level files
+    if (/^(vite\.config\.ts|vite\.config\.js|tsconfig\.json|tailwind\.config\.(js|cjs|ts)|postcss\.config\.(js|cjs)|package\.json|package-lock\.json|index\.html)$/i.test(path)) {
+      return `frontend/${path}`;
+    }
+
+    // Fix common backend root-level files
+    if (/^(requirements\.txt|pyproject\.toml|main\.py|server\.(ts|js))$/i.test(path)) {
+      return `backend/${path}`;
+    }
+
+    return path;
+  };
+
   const parseAIResponse = (response: string): GeneratedFile[] => {
     const files: GeneratedFile[] = [];
     const regex = /####\s*(.*?)\s*\n```(\w+)?\n([\s\S]*?)```/g;
@@ -163,10 +177,12 @@ export default function GeneratePage() {
       const path = match[1].trim().replace(/^'|'$/g, '');
       const content = match[3].trim();
       if (path && content) {
-        files.push({ path, content });
+        const fixedPath = fixPath(path);
+        files.push({ path: fixedPath, content });
       }
     }
 
+    // Save non-code markdown sections like "Project Overview", "Folder Structure", etc.
     const sections = response.split('\n\n---\n').map(section => section.trim());
     sections.forEach(section => {
       if (!section.startsWith('## 🔹')) return;

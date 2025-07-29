@@ -63,7 +63,7 @@ class StartResponse(BaseModel):
 
 # --- System Prompts ---
 REFINEMENT_SYSTEM_PROMPT = """
-You are a friendly and brilliant project manager. Your goal is to talk to the user and help them clarify the features for a web application they want to build. Ask clarifying questions, suggest features, and help them create a solid plan. Keep your responses concise and guide the conversation forward. Once you feel the plan is clear, confirm with the user if they are ready to generate the code.
+You are a friendly and brilliant project manager. Your goal is to talk to the user and help them clarify the features for a web application they want to build. Ask clarifying questions, suggest features, and help them create a solid plan. Keep your responses concise and guide the conversation forward. Once you feel the plan is clear, confirm with the user if they are ready to generate the code. Keep in mind that this is for a future prompt.
 """
 
 CODE_GEN_SYSTEM_PROMPT = """
@@ -72,7 +72,7 @@ You are an expert Full-Stack Developer with 25+ years of experience. Your task i
 The user and a project manager have already discussed the features. Your job is to read their entire conversation and build the application exactly as specified.
 
 ### 🔧 Tech Stack
-- Frontend: React (TypeScript) + Tailwind CSS + Vite
+- Frontend: React (TypeScript) + Tailwind CSS + Vite (Unless specified otherwise in history)
 - make sure to include all necessary files to be able to download and run this project like index.html or index.tsx etc
 - Backend: Something compatible with react
 - State Management: Zustand
@@ -90,7 +90,9 @@ Use markdown headers like:
 ```typescript
 // code here
 ```
-
+> All frontend-related files (e.g., `vite.config.ts`, `tsconfig.json`, `tailwind.config.cjs`, `index.html`, `package.json`) must be under the `frontend/` folder.  
+> All backend files (e.g., `requirements.txt`, `main.py`, `pyproject.toml`) must be under the `backend/` folder.  
+> No files should exist at the project root except the `README.md`.
 ---
 
 1.  **Project Overview**: A high-level description based on the conversation.
@@ -103,7 +105,8 @@ CODE_GEN_PLAN = {
     "Project Overview": "First, provide the 'Project Overview'. Summarize the app's features based on the entire conversation history.",
     "Folder Structure": "Next, generate the complete 'Folder Structure' in a markdown tree format.",
     "Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header as well as make sure to include all files like index etc so that no import fails as well as make sure of having all necessary libraries in the package.json for frontend.",
-    "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme"
+    "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme",
+    "Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
 }
 
 # --- API Endpoints ---
@@ -135,7 +138,7 @@ async def refine_features(request: ConversationRequest):
             model=AZURE_OPENAI_DEPLOYMENT_NAME,
             messages=history,
             temperature=0.7,
-            max_tokens=1000,
+            max_tokens=2000,
         )
         reply = response.choices[0].message.content
         history.append({"role": "assistant", "content": reply})
@@ -171,7 +174,7 @@ async def run_code_generation(request: GenerateRequest) -> str:
                 model=AZURE_OPENAI_DEPLOYMENT_NAME,
                 messages=messages,
                 temperature=0.2,
-                max_tokens=8192,
+                max_tokens=10192,
             )
 
             section_response = response.choices[0].message.content
