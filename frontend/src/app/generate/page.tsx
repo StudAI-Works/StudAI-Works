@@ -410,7 +410,8 @@ export default function GeneratePage() {
             "tailwind-merge": "^2.0.0",
             "tailwindcss": "^3.4.1",
             "autoprefixer": "^10.4.16",
-            "postcss": "^8.4.32"
+            "postcss": "^8.4.32",
+            "firebase":"^1.0.0"
           },
           devDependencies: {
             "@types/node": "^20.0.0",
