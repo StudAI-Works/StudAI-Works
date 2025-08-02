@@ -10,7 +10,14 @@ import Allusers from "../controllers/AllUsers";
 import { protect } from "../middleware/authMiddleware";
 
 const router: Router = Router();
-const FAST_API = "http://localhost:8000";
+
+// Debug logging for FastAPI connection
+// Use environment variable first, then fallback to localhost
+const FASTAPI_HOST = process.env.FASTAPI_HOST || 'localhost';
+// console.log('FASTAPI_HOST environment variable:', FASTAPI_HOST);
+// console.log('Final FastAPI URL:', `http://${FASTAPI_HOST}:8000`);
+
+const FAST_API = `http://${FASTAPI_HOST}:8000`;
 
 const upload = multer({
   storage: multer.memoryStorage(),
