@@ -8,16 +8,17 @@ import { Project } from "../controllers/Project";
 import { updateProfile, updateAvatar, getProfile } from "../controllers/profileController";
 import Allusers from "../controllers/AllUsers";
 import { protect } from "../middleware/authMiddleware";
-
+import dotenv from "dotenv"
 const router: Router = Router();
 
+dotenv.config()
 // Debug logging for FastAPI connection
 // Use environment variable first, then fallback to localhost
 const FASTAPI_HOST = process.env.FASTAPI_HOST || 'localhost';
 // console.log('FASTAPI_HOST environment variable:', FASTAPI_HOST);
-// console.log('Final FastAPI URL:', `http://${FASTAPI_HOST}:8000`);
+console.log('Final FastAPI URL:', `http://${FASTAPI_HOST}:8000`);
 
-const FAST_API = `http://${FASTAPI_HOST}:8000`;
+const FAST_API = `http://${FASTAPI_HOST}:8000`; 
 
 const upload = multer({
   storage: multer.memoryStorage(),
