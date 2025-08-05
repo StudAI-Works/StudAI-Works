@@ -1,328 +1,290 @@
-"""
-StudAI Works - AI Service
-FastAPI service for code generation using Gemini 2.5
-"""
-import re
-import json
-
-def extract_json_from_llm(text: str):
-    matches = re.findall(r"``````", text, re.DOTALL)
-    if matches:
-        json_str = matches[0].strip()
-    else:
-        match = re.search(r"(\{.*\})", text, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-        else:
-            raise ValueError("No JSON found in model response")
-    return json.loads(json_str)
-
+import os
+import copy
+import asyncio
+import logging
+import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import google.generativeai as genai
-import os
-from typing import Optional
-import logging
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from pydantic import BaseModel
-from typing import List, Optional
-from fastapi import APIRouter
-from typing import Dict
+import google.generativeai as genai
 
-class AppSpecs(BaseModel):
-    app_name: Optional[str] = None
-    description: Optional[str] = None
-    tech_stack_frontend: Optional[str] = None
-    tech_stack_backend: Optional[str] = None
-    database: Optional[str] = None
-    main_features: Optional[List[str]] = None
-    additional_notes: Optional[str] = None
-# Load environment variables
+
+# --- Setup & Configuration ---
 load_dotenv()
-
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
+
 app = FastAPI(
-    title="StudAI Works - AI Service",
-    description="AI-powered code generation service",
-    version="1.0.0"
+   title="StudAI Works - Conversational AI Coder",
+   description="A conversational service to first refine features and then generate code.",
+   version="5.0.0"
 )
 
-# Add CORS middleware to allow requests from frontend
+
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+CORSMiddleware,
+allow_origins=["*"],
+allow_credentials=True,
+allow_methods=["*"],
+allow_headers=["*"],
 )
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-print(f"GEMINI_API_KEY: {GEMINI_API_KEY}")  # Debugging line to check if key is loaded
-if not GEMINI_API_KEY:
-    logger.error("GEMINI_API_KEY not found in environment variables")
-    raise ValueError("GEMINI_API_KEY environment variable is required")
 
-genai.configure(api_key=GEMINI_API_KEY)
 
-# Initialize Gemini model
-model = genai.GenerativeModel('gemini-2.0-flash-exp')
+# --- Gemini Client Setup ---
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise RuntimeError("GOOGLE_API_KEY environment variable not set.")
+genai.configure(api_key=GOOGLE_API_KEY)
+gemini_model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
-# Request/Response models
+
+# --- In-Memory Session Storage ---
+CONVERSATION_SESSIONS = {}
+
+class ConversationRequest(BaseModel):
+    session_id: str
+    message: str
+
+
+class ConversationResponse(BaseModel):
+    reply: str
+    session_id: str
+
+
 class GenerateRequest(BaseModel):
-    userInput: str
-    specs: str = None  # Optional specs for context
+    session_id: str
 
-class GenerateResponse(BaseModel):
-    generatedPrompt: str
-    generatedCode: str
 
-def get_extraction_prompt(user_message: str, current_data: AppSpecs) -> str:
-    prior = f"""Current gathered info (use these as defaults if user doesn't correct them):
-{current_data.json(exclude_none=True)}
+class StartResponse(BaseModel):
+    session_id: str
+    message: str
 
-User message: "{user_message}"
 
-Required fields (ask for missing): app_name, description, tech_stack_frontend, tech_stack_backend, database, main_features (as a list).
+# --- System Prompts ---
+REFINEMENT_SYSTEM_PROMPT = """
+You are a friendly and brilliant project manager. Your goal is to talk to the user and help them clarify the features for a web application they want to build. Ask clarifying questions, suggest features, and help them create a solid plan. Keep your responses concise and guide the conversation forward. Once you feel the plan is clear, confirm with the user if they are ready to generate the code. Keep in mind that this is for a future prompt.
 """
-    instruction = """
-1. Parse the user message and extract any new or corrected info for these fields.
-2. Return a JSON with all known fields filled.
-3. Identify missing fields.
-4. If any required fields remain missing, set "got_information" to false and write a short message asking the user *only* for those fields.
-5. Otherwise, set "got_information" to true and return a message confirming readiness to proceed.
 
-Format:
-{
-  "app_name": "...",
-  "description": "...",
-  "tech_stack_frontend": "...",
-  "tech_stack_backend": "...",
-  "database": "...",
-  "main_features": ["...", "..."],
-  "additional_notes": "...",
-  "got_information": true/false,
-  "followup": "Message to user"
+
+CODE_GEN_SYSTEM_PROMPT = """
+You are an expert Full-Stack Developer with 25+ years of experience. Your task is to generate a complete, production-grade, and well-documented web application based on the provided conversation history.
+
+
+The user and a project manager have already discussed the features. Your job is to read their entire conversation and build the application exactly as specified.
+###You need to use CSS not tailwind and also you need to generate it inside the index.css file not in any other files and the website modren look like a webiste that goning to come look beautiful and naturally with that much styles and animations and make sure one more time everyting importted perfectly tis is very important
+
+
+### prefix the code without this error Something went wrong
+
+
+/src/store/useAppStore.ts: (0 , _zustand.default) is not a function (80:38)
+
+
+  updateNotification: (n: Notification) => void;
+  | }
+  | 
+> | const useAppStore = create<AppState>((set) => ({
+                                                ^
+  |   currentScreen: 'dashboard',
+  |   setCurrentScreen: (screen) => set({ currentScreen: screen }),
+  | 
+### 🔧 Tech Stack
+- Frontend: React (TypeScript) + CSS + Vite (Unless specified otherwise in history)
+- make sure to include all necessary files to be able to download and run this project like index.html or index.tsx etc
+- Backend: Something compatible with react
+- State Management: Zustand
+
+
+### 📂 Output Format (Strict markdown Format)
+Follow this exact format for parsing. For each step, generate ONLY the content for that step.
+Use markdown headers like:
+```
+#### frontend/src/App.tsx
+```typescript
+// code here
+```
+
+
+#### backend/src/server.ts
+```typescript
+// code here
+```
+> All frontend-related files (e.g., `vite.config.ts`, `tsconfig.json`, `tailwind.config.cjs`, `index.html`, `package.json`) must be under the `frontend/` folder.  
+> All backend files (e.g., `requirements.txt`, `main.py`, `pyproject.toml`) must be under the `backend/` folder.  
+> No files should exist at the project root except the `README.md`.
+---
+
+
+1. **Project Overview**: A high-level description based on the conversation.
+2. **Folder Structure**: A markdown tree.
+3. **Code Files**: All frontend and backend code. Use markdown headers for each file path (e.g., `#### path/to/file.ext`).
+4. **README.md**: Complete setup and run instructions.
+"""
+
+
+CODE_GEN_PLAN = {
+"Project Overview": "First, provide the 'Project Overview'. Summarize the app's features based on the entire conversation history.",
+"Folder Structure": "Next, generate the complete 'Folder Structure' in a markdown tree format.",
+"Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header as well as make sure to include all files like index etc so that no import fails as well as make sure of having all necessary libraries in the package.json for frontend.",
+"README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme",
+"Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
 }
 
-Do not ask about fields that are already filled in unless the user changed them.
-"""
-    return prior + instruction
 
-def create_meta_prompt(user_input: str) -> str:
-    """
-    Convert raw user input into a detailed, structured prompt for Gemini.
-    This version improves reliability of required files and structure.
-    """
-    meta_prompt = f"""
-You are an expert Full-Stack Developer and AI/ML Prompt Engineer with 15+ years of experience in building production-grade applications.
-
----
-
-**🧠 Task**: Build a complete full-stack application based on the user's request:  
-➡️ "{user_input}"
-
----
-
-**📦 Folder Structure Guidelines**:
-- All projects must include these root folders:
-  - `frontend/` for all client-side code
-  - `backend/` for all server-side code
-- Within `frontend/src/`, you MUST include:
-  - `App.tsx`, `index.tsx`, and a **global stylesheet** named `styles.css`
-
----
-
-**📄 Required Files**:
-- `frontend/src/styles.css`: Global stylesheet. Must always be created (even with minimal content).
-- `frontend/src/index.tsx`: Must import `./styles.css`
-- Ensure use of `.tsx` files for React components (no `.js` unless necessary)
-- Include `package.json` files in both frontend and backend if dependencies exist.
-- All imported files (e.g., `import X from './components/X'`) MUST be defined as actual code blocks with matching file paths.
-- Missing or broken import paths are NOT allowed.
-
----
-
-**🛠️Default Tech Stack**:
-- Frontend: TypeScript, React, HTML5, CSS3
-- Backend: Node.js with Express OR Python with FastAPI (based on use-case)
-- Database: PostgreSQL, SQLite or NoSQL depending on app type
-- Use clean, modular architecture with folders and reusable components
-- Ensure error handling and API validation is included
-
----
-
-**📂 Response Format**:
-1. ✅ **Project Overview** - A short description of what the app does
-2. 📁 **File Structure** - Tree view of folders and files
-3. 🔢 **Code Blocks** - Each block MUST begin with a file path comment:
-   - For TS/JS/CSS: `// path: frontend/src/styles.css`
-   - For Python: `# path: backend/api/main.py`
-   - For config: `// path: package.json`
-4. 🚀 **Setup Instructions** - Clear steps to install and run the app
-Each code block MUST begin exactly with a file path comment line as the first line inside the block:
-**IMPORTANT:**  
-- Use triple backticks (```) to start and end each code block.  
-- The path comment must be the **very first line** inside the triple backticks, with no leading spaces or blank lines.  
-- This format is strictly enforced to allow precise parsing.
----
-
-**💡 Example for styles.css (must always include at least this):**
-"""
-    meta_prompt += """
-```css
-// path: frontend/src/styles.css
-body {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, sans-serif;
-}"""
-
-    
-    return meta_prompt
-
+# --- API Endpoints ---
 @app.get("/")
 async def root():
-    """Health check endpoint"""
-    return {"message": "StudAI Works AI Service is running!", "status": "healthy"}
+    return {"message": "Conversational AI Coder is running!", "status": "healthy"}
 
-@app.get("/health")
-async def health_check():
-    """Detailed health check"""
+
+@app.post("/start-conversation", response_model=StartResponse)
+async def start_conversation():
+    session_id = str(uuid.uuid4())
+    initial_message = "Hello! I'm here to help you plan your web application. What are you thinking of building today?"
+    CONVERSATION_SESSIONS[session_id] = [
+        {"role": "system", "content": REFINEMENT_SYSTEM_PROMPT},
+        {"role": "assistant", "content": initial_message}
+    ]
+    logger.info(f"New conversation started: {session_id}")
+    return StartResponse(session_id=session_id, message=initial_message)
+
+
+
+
+@app.post("/refine", response_model=ConversationResponse)
+async def refine_features(request: ConversationRequest):
+    if request.session_id not in CONVERSATION_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    history = CONVERSATION_SESSIONS[request.session_id]
+    history.append({"role": "user", "content": request.message})
+
+
+    # Prepare messages for Gemini
+    gemini_history = []
+    for m in history:
+        if m["role"] == "system":
+            gemini_history.append({"role": "user", "parts": [m["content"]]})
+        elif m["role"] == "assistant":
+            gemini_history.append({"role": "model", "parts": [m["content"]]})
+        else:
+            gemini_history.append({"role": "user", "parts": [m["content"]]})
+
+
     try:
-        # Test Gemini API connection
-        test_response = model.generate_content("Hello")
-        return {
-            "status": "healthy",
-            "service": "StudAI Works AI Service",
-            "gemini_api": "connected",
-            "version": "1.0.0"
-        }
+        response = await asyncio.to_thread(
+            lambda: gemini_model.generate_content(gemini_history)
+        )
+        reply = response.text
+        history.append({"role": "assistant", "content": reply})
+        CONVERSATION_SESSIONS[request.session_id] = history
+        return ConversationResponse(reply=reply, session_id=request.session_id)
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        logger.error(f"Error during refinement: {e}")
+    raise HTTPException(status_code=500, detail="AI conversation failed.")
 
-@app.post("/generate", response_model=GenerateResponse)
+
+# New function: Non-streamed generation
+async def run_code_generation(request: GenerateRequest) -> str:
+    if request.session_id not in CONVERSATION_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found to generate code from.")
+
+
+    conversation_history = copy.deepcopy(CONVERSATION_SESSIONS[request.session_id])
+
+
+    # Prepare messages for Gemini
+    gemini_history = [
+        {"role": "user", "parts": [CODE_GEN_SYSTEM_PROMPT]},
+        {"role": "user", "parts": [
+            "Here is the full conversation history. Please generate the application based on this.\n\n" +
+            "\n".join([f"{m['role']}: {m['content']}" for m in conversation_history if m['role'] != 'system'])
+        ]}
+    ]
+
+
+    full_output = ""
+    try:
+        for section_title, section_task in CODE_GEN_PLAN.items():
+            gemini_history.append({"role": "user", "parts": [section_task]})
+
+
+            response = await asyncio.to_thread(
+                lambda: gemini_model.generate_content(gemini_history)
+            )
+
+
+            section_response = response.text
+            gemini_history.append({"role": "model", "parts": [section_response]})
+
+
+            full_output += f"\n\n---\n## 🔹 {section_title}\n\n{section_response}"
+
+
+    except Exception as e:
+        logger.error(f"Error during generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error during code generation: {str(e)}")
+
+
+    return full_output
+
+
+# Final API endpoint
+@app.post("/generate")
 async def generate_code(request: GenerateRequest):
-    """
-    Main endpoint to generate code from user input
-    """
     try:
-        logger.info(f"Received request: {request.userInput}")
-        
-        # Validate input
-        if not request.userInput or len(request.userInput.strip()) < 10:
-            raise HTTPException(
-                status_code=400, 
-                detail="User input must be at least 10 characters long"
-            )
-        
-        # Create structured prompt
-        detailed_prompt = create_meta_prompt(request.userInput)
-        logger.info("Generated meta-prompt for Gemini")
-        detailed_prompt += f"\n\nUser specs: {request.specs}" if request.specs else ""
-        # Call Gemini API
-        try:
-            response = model.generate_content(detailed_prompt)
-            generated_code = response.text
-            logger.info("Successfully received response from Gemini")
-            
-        except Exception as gemini_error:
-            logger.error(f"Gemini API error: {str(gemini_error)}")
-            raise HTTPException(
-                status_code=503,
-                detail=f"AI service temporarily unavailable: {str(gemini_error)}"
-            )
-        
-        # Validate response
-        if not generated_code:
-            raise HTTPException(
-                status_code=500,
-                detail="AI service returned empty response"
-            )
-        
-        # Return structured response
-        return GenerateResponse(
-            generatedPrompt=detailed_prompt,
-            generatedCode=generated_code
-        )
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
+        full_output = await run_code_generation(request)
+        return Response(content=full_output, media_type='text/markdown')
     except Exception as e:
-        logger.error(f"Unexpected error in generate_code: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(e)}"
-        )
-
-spec_sessions: Dict[str, AppSpecs] = {}
-router = APIRouter()
-class SpecChatRequest(BaseModel):
-    user_message: str
-
-@router.post("/spec-chat")
-async def spec_chat(request: SpecChatRequest):
-    user_id = 1
-    user_message = request.user_message
-    print("Hello from spec_chat")
-    session = spec_sessions.get(user_id, AppSpecs())
-    print(f"Current session for user {user_id}: {session}")
-    prompt = get_extraction_prompt(user_message, session)
-    try:
-        response = model.generate_content(prompt)
-        response = model.generate_content(prompt)
-        result = extract_json_from_llm(response.text)
-    except Exception as e:
-        logger.error(f"Error parsing LLM response: {e}")
-        raise HTTPException(500, f"Error parsing AI response: {str(e)}")
-    # Convert empty dicts to None for Pydantic compatibility
-    def clean_value(val):
-        # Recursively handle nested lists/dicts if needed in future
-        if val == {}:
-            return None
-        return val
-
-    updated = AppSpecs(**{field: clean_value(result.get(field)) for field in AppSpecs.model_fields.keys()})
-    spec_sessions[user_id] = updated
-
-    return {
-     "specs": updated.model_dump(),
-     "got_information": result.get("got_information", False),
-     "followup": result.get("followup", "Please provide more details."),
- }
-    
-
-@app.post("/generate-simple")
-async def generate_simple(request: GenerateRequest):
-    """
-    Simplified endpoint for quick testing
-    """
-    try:
-        simple_prompt = f"Create a simple web application for: {request.userInput}. Include HTML, CSS, and JavaScript code."
-        
-        response = model.generate_content(simple_prompt)
-        
-        return {
-            "userInput": request.userInput,
-            "generatedCode": response.text,
-            "prompt": simple_prompt
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in generate_simple: {str(e)}")
+        logger.error(f"Error during generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-app.include_router(router)
+
+
+@app.post("/parse-text", response_model=ConversationResponse)
+async def parse_text(request: ConversationRequest):
+    print("Parse text request:", request)
+    if request.session_id not in CONVERSATION_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    conversation_history = copy.deepcopy(CONVERSATION_SESSIONS[request.session_id])
+
+    prompt = f"""
+You are an expert full-stack developer and code reviewer aware of the entire project.
+
+Here is the prior conversation history summarizing the project:
+{chr(10).join([m['content'] for m in conversation_history if m['role'] != 'system'])}
+
+The user now provides the following new input or change request:
+{request.message}
+Your task:
+- Analyze the new input and decide which file(s) in the project need to be changed to reflect it.
+- Provide the updated or corrected code for only those file(s).
+- For each file, return the filename and the full corrected code (not partial lines).
+- Respond in this EXACT markdown format for each file (only these sections, concatenated):
+
+
+#### filename.ext
+// full corrected code here
+
+Return the response as a markdown string containing one or more such file sections.
+"""
+
+    try:
+        response = await asyncio.to_thread(
+            lambda: gemini_model.generate_content([
+                {"role": "user", "parts": [prompt]}
+            ])
+        )
+        print("Response from Gemini:", response.text)
+        markdown_response = response.text.strip()
+        return ConversationResponse(reply=markdown_response, session_id=request.session_id)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
