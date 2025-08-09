@@ -220,7 +220,8 @@ async def run_code_generation(request: GenerateRequest) -> str:
             section_response = response.text
             gemini_history.append({"role": "model", "parts": [section_response]})
 
-
+            
+            CONVERSATION_SESSIONS[request.session_id] = conversation_history + gemini_history
             full_output += f"\n\n---\n## 🔹 {section_title}\n\n{section_response}"
 
 
@@ -255,7 +256,7 @@ async def parse_text(request: ConversationRequest):
 You are an expert full-stack developer and code reviewer aware of the entire project.
 
 Here is the prior conversation history summarizing the project:
-{chr(10).join([m['content'] for m in conversation_history if m['role'] != 'system'])}
+{chr(10).join([str(part) for m in conversation_history if m.get('role') != 'system' and 'parts' in m for part in m['parts']])}
 
 The user now provides the following new input or change request:
 {request.message}
@@ -269,7 +270,7 @@ Your task:
 #### filename.ext
 // full corrected code here
 
-Return the response as a markdown string containing one or more such file sections.
+Return the response as a markdown string containing one or more such file sections preferably using correcting an existing file.
 """
 
     try:
@@ -279,6 +280,11 @@ Return the response as a markdown string containing one or more such file sectio
             ])
         )
         print("Response from Gemini:", response.text)
+        history = CONVERSATION_SESSIONS[request.session_id]
+        history.append({"role": "user", "parts": [request.message]})
+        # Add the Gemini response in 'parts' format
+        history.append({"role": "model", "parts": [response.text.strip()]})
+        CONVERSATION_SESSIONS[request.session_id] = history
         markdown_response = response.text.strip()
         return ConversationResponse(reply=markdown_response, session_id=request.session_id)
 

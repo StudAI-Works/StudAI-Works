@@ -21,6 +21,7 @@ import { useAuth } from "../context/authContext";
 import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
+import { se } from "date-fns/locale";
 
 // Interfaces
 interface Message {
@@ -39,7 +40,6 @@ interface FileTreeNode {
   type: "file" | "folder";
   children?: FileTreeNode[];
 }
-let hasGenerated = false;
 // Constant Arrays
 const quickActions = [
   { icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" },
@@ -345,7 +345,7 @@ export default function GeneratePage() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const [hasGenerated, setHasGenerated] = useState(false);
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
 
@@ -1173,26 +1173,29 @@ export default fallbackFunction;`;
     
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
-if (hasGenerated) {
-  const refinedFiles = parseAIResponse(data.reply);
-  if (refinedFiles.length > 0) {
-    // Merge refined files into existing files (
-    // replace only changed files)
-    console.log("Refined files:", refinedFiles);
-    const mergedFiles = mergeFiles(generatedFiles, refinedFiles);
+      if (hasGenerated) {
+        const refinedFiles = parseAIResponse(data.reply);
+        if (refinedFiles.length > 0) {
+          // Merge refined files into existing files (
+          // replace only changed files)
+          console.log("Refined files:", refinedFiles);
+          const mergedFiles = mergeFiles(generatedFiles, refinedFiles);
 
-    // Update your states accordingly
-    setGeneratedFiles(mergedFiles);
+          // Update your states accordingly
+          setGeneratedFiles(mergedFiles);
 
-    const updatedTree = buildFileTree(mergedFiles);
-    setFileTree(updatedTree);
+          const updatedTree = buildFileTree(mergedFiles);
+          setFileTree(updatedTree);
 
-    // Optionally maintain selectedFile and expandedFolders state,
-    // or update if refined files contain the selected file
-  }
-}
+          // Optionally maintain selectedFile and expandedFolders state,
+          // or update if refined files contain the selected file
+        }
+        toast.update(loadingToastId, { render: "Code updated!", type: "success", isLoading: false, autoClose: 2000 });
+      }
+      else {
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
       toast.update(loadingToastId, { render: "Response received!", type: "success", isLoading: false, autoClose: 2000 });
+      }
     } catch (err: any) {
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
       toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
@@ -1219,7 +1222,7 @@ if (hasGenerated) {
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: sessionid }),
       });
-      hasGenerated=true;
+      setHasGenerated(true);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
