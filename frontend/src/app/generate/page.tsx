@@ -1053,7 +1053,19 @@ export default fallbackFunction;`;
     }
 
     return path;
-  };
+    };
+  function mergeFiles(
+    originalFiles: GeneratedFile[],
+    updatedFiles: GeneratedFile[]
+  ): GeneratedFile[] {
+    const fileMap = new Map(originalFiles.map(f => [f.path, f]));
+
+    updatedFiles.forEach(updatedFile => {
+      fileMap.set(updatedFile.path, updatedFile); // replace or add file
+    });
+
+    return Array.from(fileMap.values());
+  }
 
   const parseAIResponse = (response: string): GeneratedFile[] => {
     const files: GeneratedFile[] = [];
@@ -1161,6 +1173,24 @@ export default fallbackFunction;`;
     
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
+if (hasGenerated) {
+  const refinedFiles = parseAIResponse(data.reply);
+  if (refinedFiles.length > 0) {
+    // Merge refined files into existing files (
+    // replace only changed files)
+    console.log("Refined files:", refinedFiles);
+    const mergedFiles = mergeFiles(generatedFiles, refinedFiles);
+
+    // Update your states accordingly
+    setGeneratedFiles(mergedFiles);
+
+    const updatedTree = buildFileTree(mergedFiles);
+    setFileTree(updatedTree);
+
+    // Optionally maintain selectedFile and expandedFolders state,
+    // or update if refined files contain the selected file
+  }
+}
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
       toast.update(loadingToastId, { render: "Response received!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
