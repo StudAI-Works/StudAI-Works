@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Code, Users, Cloud, Star, Github, Twitter, Linkedin } from "lucide-react"
+import { ArrowRight, Code, Users, Cloud, Linkedin } from "lucide-react"
 import { Link } from "react-router-dom"
 import { Header } from "@/components/header"
 
@@ -158,11 +158,13 @@ export default function LandingPage() {
   </div>
 
   <div>
-    <h4 className="font-semibold mb-4">Product</h4>
+    <h4 className="font-semibold mb-4">Ecosystem</h4>
     <ul className="space-y-2 text-muted-foreground">
-      <li><Link to="/features" className="hover:text-foreground">Features</Link></li>
-      <li><Link to="/pricing" className="hover:text-foreground">Pricing</Link></li>
-      <li><a href="https://docs.studai.com" target="_blank" rel="noopener noreferrer">Documentation</a></li>
+      <li><a href="https://stud-ai.com/#Roadmap" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Genie</a></li>
+      <li><a href="https://studaiworks.com/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Works</a></li>
+      <li><a href="https://studaielev8.com/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Elev8</a></li>
+      <li><a href="https://stud-ai.com/#products" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Loop</a></li>
+      <li><a href="https://stud-ai.com/#products" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Creator</a></li>
       {/* <li><Link to="/api" className="hover:text-foreground">API</Link></li> */}
     </ul>
   </div>
@@ -183,12 +185,11 @@ export default function LandingPage() {
       <li><Link to="/privacy" className="hover:text-foreground">Privacy Policy</Link></li>
       <li><Link to="/terms" className="hover:text-foreground">Terms & Conditions</Link></li>
       <li><Link to="/security" className="hover:text-foreground">Security</Link></li>
-      {/* GDPR Removed */}
     </ul>
   </div>
 </div>
 
-          <div className="border-t mt-8 pt-8 text-center text-muted-foreground"><p>© 2024 STUDAI EDUTECH PVT. LTD. All rights reserved.</p></div>
+          <div className="border-t mt-8 pt-8 text-center text-muted-foreground"><p>© 2025 STUDAI EDUTECH PVT. LTD. All rights reserved.</p></div>
         </div>
       </footer>
     </div>
