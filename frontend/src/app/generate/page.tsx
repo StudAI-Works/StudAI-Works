@@ -40,6 +40,7 @@ interface FileTreeNode {
   type: "file" | "folder";
   children?: FileTreeNode[];
 }
+
 // Constant Arrays
 const quickActions = [
   { icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" },
@@ -346,6 +347,7 @@ export default function GeneratePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
+
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
 
@@ -1053,7 +1055,8 @@ export default fallbackFunction;`;
     }
 
     return path;
-    };
+  };
+
   function mergeFiles(
     originalFiles: GeneratedFile[],
     updatedFiles: GeneratedFile[]
@@ -1148,8 +1151,7 @@ export default fallbackFunction;`;
       toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     }
   };
-
-  const handleSend = async (prompt?: string) => {
+const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
     
 
