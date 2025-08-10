@@ -307,6 +307,7 @@ async def generate_code(request: GenerateRequest):
         return Response(content=full_output, media_type='text/markdown')
     except Exception as e:
         logger.error(f"Error during generation: {str(e)}")
+        logger.error(f"Error during generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/parse-text", response_model=ConversationResponse)
@@ -383,4 +384,5 @@ Rules:
 
 if __name__ == "__main__":
     import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

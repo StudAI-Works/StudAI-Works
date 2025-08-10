@@ -14,7 +14,7 @@ const router: Router = Router();
 dotenv.config()
 // Debug logging for FastAPI connection
 // Use environment variable first, then fallback to localhost
-const FASTAPI_HOST = process.env.FASTAPI_HOST || 'localhost';
+const FASTAPI_HOST = 'localhost';
 // console.log('FASTAPI_HOST environment variable:', FASTAPI_HOST);
 console.log('Final FastAPI URL:', `http://${FASTAPI_HOST}:8000`);
 
@@ -42,6 +42,7 @@ router.route("/allusers").get(protect, Allusers);
 // Conversational AI routes
 router.post("/api/start-conversation", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    console.log("Starting conversation...");
     const response = await axios.post(`${FAST_API}/start-conversation`);
     res.status(200).json(response.data);
   } catch (error: any) {

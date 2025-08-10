@@ -4,7 +4,7 @@ import router from "../route/route";
 import dotenv from "dotenv"
 
 // Only load .env if environment variables are not already set
-dotenv.config({ override: false })
+dotenv.config()
 
 const PORT = Number(process.env.PORT) || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
