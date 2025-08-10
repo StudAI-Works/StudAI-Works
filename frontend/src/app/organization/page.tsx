@@ -195,9 +195,9 @@ export default function OrganizationPage() {
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="org-name">Organization Name</Label>
-                        <Input id="org-name" placeholder="My Awesome Company" />
+                        <Input id="org-name" placeholder="Your Organization Name" />
                       </div>
-                      <div>
+                      <div> 
                         <Label htmlFor="org-description">Description</Label>
                         <Textarea id="org-description" placeholder="What does your organization do?" rows={3} />
                       </div>

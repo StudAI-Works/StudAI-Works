@@ -22,7 +22,7 @@ export function ChatWidget() {
     {
       id: "1",
       type: "bot",
-      content: "Hi! I'm here to help you with Nexus Cloud Platform. How can I assist you today?",
+      content: "Hi! I'm here to help you with StudAI Builder. How can I assist you today?",
       timestamp: new Date(),
     },
   ])
@@ -70,11 +70,11 @@ export function ChatWidget() {
     const lowerInput = userInput.toLowerCase()
 
     if (lowerInput.includes("help") || lowerInput.includes("support")) {
-      return "I'm here to help! You can ask me about:\n• Getting started with Nexus\n• Code generation features\n• Deployment options\n• Billing and account questions\n• Technical issues\n\nWhat specific topic would you like help with?"
+      return "I'm here to help! You can ask me about:\n• Getting started with StudAI Builder\n• Code generation features\n• Deployment options\n• Billing and account questions\n• Technical issues\n\nWhat specific topic would you like help with?"
     }
 
     if (lowerInput.includes("deploy") || lowerInput.includes("deployment")) {
-      return "Great question about deployment! Nexus supports one-click deployment to:\n• Vercel\n• Netlify\n• Railway\n\nJust click the Deploy button in the navbar and choose your preferred platform. Need help with a specific deployment?"
+      return "Great question about deployment! StudAI Builder supports one-click deployment to:\n• Vercel\n• Netlify\n• Railway\n\nJust click the Deploy button in the navbar and choose your preferred platform. Need help with a specific deployment?"
     }
 
     if (lowerInput.includes("code") || lowerInput.includes("generate")) {
@@ -94,7 +94,7 @@ export function ChatWidget() {
     }
 
     // Default response
-    return "Thanks for your question! I'm here to help with Nexus Cloud Platform. You can also:\n• Check our Help & Support page for detailed guides\n• Browse our documentation\n• Contact our support team directly\n\nIs there something specific I can help you with?"
+    return "Thanks for your question! I'm here to help with StudAI Builder. You can also:\n• Check our Help & Support page for detailed guides\n• Browse our documentation\n• Contact our support team directly\n\nIs there something specific I can help you with?"
   }
 
   if (!isOpen) {
@@ -119,7 +119,7 @@ export function ChatWidget() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center">
               <Bot className="h-4 w-4 mr-2" />
-              Nexus Support
+              StudAI Builder Support
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Button

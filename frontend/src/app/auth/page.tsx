@@ -124,7 +124,7 @@ export default function  AuthPage() {
         <div className="flex items-center justify-center mb-8">
           <Link to="/" className="flex items-center space-x-2">
             <Code className="h-8 w-8 text-primary" />
-            <span className="font-bold text-xl">Nexus Cloud Platform</span>
+            <span className="font-bold text-xl">StudAI Builder</span>
           </Link>
         </div>
 

@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try {
       // --- UPDATE: We now store the entire session object ---
-      const storedSession = localStorage.getItem('nexus-session');
+      const storedSession = localStorage.getItem('StudAI-Builder');
       if (storedSession) {
         const session: Session = JSON.parse(storedSession);
         console.log(session)
@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Failed to parse session from localStorage", error);
-      localStorage.removeItem('nexus-session');
+      localStorage.removeItem('StudAI-Builder');
     } finally {
       setIsLoading(false);
     }
@@ -54,14 +54,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // --- UPDATE: Store the full session ---
     setUser(sessionData.user);
     setToken(sessionData.token);
-    localStorage.setItem('nexus-session', JSON.stringify(sessionData));
+    localStorage.setItem('StudAI-Builder', JSON.stringify(sessionData));
   };
 
   const logout = () => {
     setUser(null);
     setToken(null);
     // --- UPDATE: Clear the session, not just the user ---
-    localStorage.removeItem('nexus-session');
+    localStorage.removeItem('StudAI-Builder');
     window.location.href = '/'; 
   };
 
