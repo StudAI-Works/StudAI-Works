@@ -19,7 +19,7 @@ export default function HomePage() {
       <Header user={headerUser} onLogout={logout} />
       
       <main className="container mx-auto text-center py-20 px-4">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to Nexus Cloud Platform</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">Welcome to StudAI Builder</h1>
         <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
           The all-in-one solution for generating, building, and deploying your modern web applications with the power of AI.
         </p>

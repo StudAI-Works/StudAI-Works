@@ -9,8 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 import google.generativeai as genai
-
-
+import re
 # --- Setup & Configuration ---
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +31,19 @@ allow_methods=["*"],
 allow_headers=["*"],
 )
 
-
+def get_file_language(filename: str) -> str:
+    ext = filename.split('.')[-1]
+    return {
+        "ts": "typescript",
+        "tsx": "typescript",
+        "js": "javascript",
+        "jsx": "javascript",
+        "css": "css",
+        "json": "json",
+        "html": "html",
+        "md": "markdown",
+        "py": "python"
+    }.get(ext, "")
 # --- Gemini Client Setup ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
@@ -119,7 +130,7 @@ Use markdown headers like:
 
 
 1. **Project Overview**: A high-level description based on the conversation.
-2. **Folder Structure**: A markdown tree.
+2. **Folder Structure**: A markdown tree(Always include in README.md).
 3. **Code Files**: All frontend and backend code. Use markdown headers for each file path (e.g., `#### path/to/file.ext`).
 4. **README.md**: Complete setup and run instructions.
 """
@@ -132,8 +143,49 @@ CODE_GEN_PLAN = {
 "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme",
 "Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
 }
+import re
+def parse_markdown_to_dict(markdown: str):
+    """
+    Extracts code files from markdown output in format:
+    #### path/to/file.ext
+    ```<optional lang>
+    ...content...
+    ```
+    Returns dict: {file_path: content}
+    """
+    # Matches: #### filename\n```[optional lang]\n(content)\n```
+    file_pattern = r'#### (.+?)\s*\n```(?:[a-zA-Z0-9]*)\s*\n([\s\S]*?)```'
+    files = {}
+    for match in re.finditer(file_pattern, markdown, re.DOTALL):
+        path, content = match.groups()
+        files[path.strip()] = content.strip()
+    return files
 
+def extract_project_summary(markdown: str):
+    """
+    Pull Project Overview section from markdown output.
+    Looks for "## 🔹 Project Overview" ... until next "---"
+    """
+    summary_re = r'## 🔹 Project Overview\s*\n([\s\S]*?)(?:\n---|\Z)'
+    m = re.search(summary_re, markdown, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return ""
 
+def extract_readme(markdown_output: str) -> str:
+    """
+    Extracts README.md content from markdown output formatted like:
+    #### README.md
+    ```markdown
+    ...content...
+    ```
+    """
+    pattern = r"#### README\.md\s+```(?:markdown)?\s*([\s\S]*?)```"
+    match = re.search(pattern, markdown_output, re.DOTALL)
+    print(match)
+    if match:
+        return match.group(1).strip()
+    return ""
 # --- API Endpoints ---
 @app.get("/")
 async def root():
@@ -238,58 +290,96 @@ async def run_code_generation(request: GenerateRequest) -> str:
 async def generate_code(request: GenerateRequest):
     try:
         full_output = await run_code_generation(request)
+        files_dict = parse_markdown_to_dict(full_output)
+        summary = extract_project_summary(full_output)
+        readme_content = extract_readme(full_output)
+        # Always store session as a dict
+        old_session = CONVERSATION_SESSIONS.get(request.session_id)
+        if isinstance(old_session, dict):
+            session = old_session
+        else:
+            session = {}
+        session["files"] = files_dict
+        session["summary"] = summary
+        session["readme"] = readme_content
+        session["full_markdown"] = full_output
+        CONVERSATION_SESSIONS[request.session_id] = session
         return Response(content=full_output, media_type='text/markdown')
     except Exception as e:
         logger.error(f"Error during generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/parse-text", response_model=ConversationResponse)
 async def parse_text(request: ConversationRequest):
-    print("Parse text request:", request)
-    if request.session_id not in CONVERSATION_SESSIONS:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session_data = CONVERSATION_SESSIONS.get(request.session_id)
+    if not session_data or "files" not in session_data or "readme" not in session_data:
+        raise HTTPException(status_code=404, detail="Session or project not found.")
 
-    conversation_history = copy.deepcopy(CONVERSATION_SESSIONS[request.session_id])
+    readme_content = session_data["readme"]
+    print(f"Using README content for session {request.session_id}:\n{readme_content[:100]}...")  # Log first 100 chars
+    all_files = session_data["files"]
+    print(f"Parsing text for session {request.session_id} with {len(all_files)} files.")
+    # STEP 1: Figure out affected file(s)
+    file_list_prompt = f"""
+Project README.md:
+{readme_content}
 
-    prompt = f"""
-You are an expert full-stack developer and code reviewer aware of the entire project.
-
-Here is the prior conversation history summarizing the project:
-{chr(10).join([str(part) for m in conversation_history if m.get('role') != 'system' and 'parts' in m for part in m['parts']])}
-
-The user now provides the following new input or change request:
+User request:
 {request.message}
-Your task:
-- Analyze the new input and decide which file(s) in the project need to be changed to reflect it.
-- Provide the updated or corrected code for only those file(s).
-- For each file, return the filename and the full corrected code (not partial lines).
-- Respond in this EXACT markdown format for each file (only these sections, concatenated):
 
+From the project files list below, identify exactly which file(s) should be modified:
+{list(all_files.keys())}
+
+Return only the file paths, one per line. No explanations.
+"""
+    files_resp = await asyncio.to_thread(
+        lambda: gemini_model.generate_content([{"role": "user", "parts": [file_list_prompt]}])
+    )
+    affected_files = [f.strip() for f in files_resp.text.splitlines() if f.strip() in all_files]
+
+    if not affected_files:
+        raise HTTPException(status_code=400, detail="Could not determine affected files.")
+    print(f"Affected files for session {request.session_id}: {affected_files}")
+    # STEP 2: Give LLM README + only relevant file(s)
+    files_context = ""
+    for fname in affected_files:
+        file_content = all_files.get(fname, "")
+        files_context += f"\n#### {fname}\n```{get_file_language(fname)}\n{file_content}\n```\n"
+    print(f"Files context for session {request.session_id}:\n{files_context}...")  # Log first 1000 chars
+    edit_prompt = f"""
+You are an expert full-stack developer.
+
+Use the README.md below for full project context:
+{readme_content}
+
+The following is the current content of the file(s) that need modification:
+{files_context}
+
+User's change request:
+{request.message}
+
+Rules:
+- Keep the file name exactly the same.
+- Only apply the requested changes.
+- Preserve coding style, formatting, and imports from the existing file.
+- Return the changed file(s) in this EXACT markdown format:
 
 #### filename.ext
-// full corrected code here
-
-Return the response as a markdown string containing one or more such file sections preferably using correcting an existing file.
+//updated content here
 """
+    edit_resp = await asyncio.to_thread(
+        lambda: gemini_model.generate_content([{"role": "user", "parts": [edit_prompt]}])
+    )
 
-    try:
-        response = await asyncio.to_thread(
-            lambda: gemini_model.generate_content([
-                {"role": "user", "parts": [prompt]}
-            ])
-        )
-        print("Response from Gemini:", response.text)
-        history = CONVERSATION_SESSIONS[request.session_id]
-        history.append({"role": "user", "parts": [request.message]})
-        # Add the Gemini response in 'parts' format
-        history.append({"role": "model", "parts": [response.text.strip()]})
-        CONVERSATION_SESSIONS[request.session_id] = history
-        markdown_response = response.text.strip()
-        return ConversationResponse(reply=markdown_response, session_id=request.session_id)
+    updated_files = parse_markdown_to_dict(edit_resp.text)
+    for fpath, content in updated_files.items():
+        all_files[fpath] = content
+    session_data["files"] = all_files
+    CONVERSATION_SESSIONS[request.session_id] = session_data
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return ConversationResponse(reply=edit_resp.text.strip(), session_id=request.session_id)
+
+
 
 if __name__ == "__main__":
     import uvicorn

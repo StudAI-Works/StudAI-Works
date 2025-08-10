@@ -22,7 +22,7 @@ export function ChatWidget() {
     {
       id: "1",
       type: "bot",
-      content: "Hi! I'm here to help you with Nexus Cloud Platform. How can I assist you today?",
+      content: "Hi! I'm here to help you with StudAI Builder. How can I assist you today?",
       timestamp: new Date(),
     },
   ])

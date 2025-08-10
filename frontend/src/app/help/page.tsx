@@ -84,7 +84,7 @@ const knowledgeBase = [
     id: 6,
     title: "API Reference Documentation",
     category: "API",
-    content: "Complete API documentation for integrating Nexus Cloud Platform with your applications.",
+    content: "Complete API documentation for integrating StudAI Builder with your applications.",
     tags: ["api", "documentation", "integration", "reference"],
     readTime: "15 min",
     popularity: 70,
@@ -111,7 +111,7 @@ const knowledgeBase = [
 
 const faqs = [
   {
-    question: "How do I get started with Nexus Cloud Platform?",
+    question: "How do I get started with StudAI Builder?",
     answer:
       "Getting started is easy! Simply sign up for a free account, then use our AI-powered Generate feature to describe what you want to build. Our AI will create a blueprint and generate the code for you.",
   },
@@ -325,7 +325,7 @@ const headerUser = {
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold mb-4">Help & Support</h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Get the help you need to make the most of Nexus Cloud Platform
+                Get the help you need to make the most of StudAI Builder
               </p>
             </div>
 
