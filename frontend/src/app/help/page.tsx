@@ -84,7 +84,7 @@ const knowledgeBase = [
     id: 6,
     title: "API Reference Documentation",
     category: "API",
-    content: "Complete API documentation for integrating Nexus Cloud Platform with your applications.",
+    content: "Complete API documentation for integrating StudAI Builder with your applications.",
     tags: ["api", "documentation", "integration", "reference"],
     readTime: "15 min",
     popularity: 70,
@@ -111,7 +111,7 @@ const knowledgeBase = [
 
 const faqs = [
   {
-    question: "How do I get started with Nexus Cloud Platform?",
+    question: "How do I get started with StudAI Builder?",
     answer:
       "Getting started is easy! Simply sign up for a free account, then use our AI-powered Generate feature to describe what you want to build. Our AI will create a blueprint and generate the code for you.",
   },
@@ -173,32 +173,32 @@ const supportChannels = [
   },
 ]
 
-const resources = [
-  {
-    icon: Video,
-    title: "Video Tutorials",
-    description: "Step-by-step video guides",
-    count: "50+ videos",
-  },
-  {
-    icon: FileText,
-    title: "API Documentation",
-    description: "Complete API reference",
-    count: "Full reference",
-  },
-  {
-    icon: Code,
-    title: "Code Examples",
-    description: "Ready-to-use code snippets",
-    count: "100+ examples",
-  },
-  {
-    icon: Zap,
-    title: "Quick Start Guide",
-    description: "Get up and running in minutes",
-    count: "5 min read",
-  },
-]
+// const resources = [
+//   {
+//     icon: Video,
+//     title: "Video Tutorials",
+//     description: "Step-by-step video guides",
+//     count: "50+ videos",
+//   },
+//   {
+//     icon: FileText,
+//     title: "API Documentation",
+//     description: "Complete API reference",
+//     count: "Full reference",
+//   },
+//   {
+//     icon: Code,
+//     title: "Code Examples",
+//     description: "Ready-to-use code snippets",
+//     count: "100+ examples",
+//   },
+//   {
+//     icon: Zap,
+//     title: "Quick Start Guide",
+//     description: "Get up and running in minutes",
+//     count: "5 min read",
+//   },
+// ]
 
 // System Status Data
 const systemStatus = {
@@ -213,20 +213,20 @@ const systemStatus = {
     { name: "File Storage", status: "operational", uptime: "99.8%", responseTime: "110ms" },
   ],
   incidents: [
-    {
-      id: 1,
-      title: "Scheduled Maintenance - Database Optimization",
-      status: "completed",
-      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      description: "Routine database optimization completed successfully.",
-    },
-    {
-      id: 2,
-      title: "Minor Deployment Delays",
-      status: "resolved",
-      date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      description: "Brief delays in deployment services have been resolved.",
-    },
+    // {
+    //   id: 1,
+    //   title: "Scheduled Maintenance - Database Optimization",
+    //   status: "completed",
+    //   date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    //   description: "Routine database optimization completed successfully.",
+    // },
+    // {
+    //   id: 2,
+    //   title: "Minor Deployment Delays",
+    //   status: "resolved",
+    //   date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    //   description: "Brief delays in deployment services have been resolved.",
+    // },
   ],
 }
 
@@ -325,7 +325,7 @@ const headerUser = {
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold mb-4">Help & Support</h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Get the help you need to make the most of Nexus Cloud Platform
+                Get the help you need to make the most of StudAI Builder
               </p>
             </div>
 
@@ -343,11 +343,11 @@ const headerUser = {
             </div>
 
             <Tabs defaultValue="knowledge" className="space-y-8">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
                 <TabsTrigger value="faq">FAQ</TabsTrigger>
                 <TabsTrigger value="support">Contact Support</TabsTrigger>
-                <TabsTrigger value="resources">Resources</TabsTrigger>
+                {/* <TabsTrigger value="resources">Resources</TabsTrigger> */}
                 <TabsTrigger value="status">System Status</TabsTrigger>
               </TabsList>
 
@@ -532,7 +532,7 @@ const headerUser = {
                 </div>
               </TabsContent>
 
-              {/* Resources Tab */}
+              {/* Resources Tab    //if you want the resource tab just remove the command line//
               <TabsContent value="resources" className="space-y-8">
                 <div>
                   <h2 className="text-2xl font-bold mb-6">Learning Resources</h2>
@@ -582,7 +582,7 @@ const headerUser = {
                       ))}
                   </div>
                 </div>
-              </TabsContent>
+              </TabsContent> */}
 
               {/* Status Tab */}
               <TabsContent value="status" className="space-y-8">
@@ -633,7 +633,7 @@ const headerUser = {
                     ))}
                   </div>
 
-                  {/* Recent Incidents */}
+                  {/* Recent Incidents
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Recent Incidents</h3>
                     {systemStatus.incidents.map((incident) => (
@@ -661,7 +661,7 @@ const headerUser = {
                         </CardContent>
                       </Card>
                     ))}
-                  </div>
+                  </div> */}
                 </div>
               </TabsContent>
             </Tabs>

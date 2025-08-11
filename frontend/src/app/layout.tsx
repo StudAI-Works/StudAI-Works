@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Nexus Cloud Platform - Your Intelligent Code Companion",
+  title: "StudAI Builder  - Your Intelligent Code Companion",
   description: "Build Projects at Lightning Speed with AI-powered development tools",
     generator: 'v0.dev'
 }

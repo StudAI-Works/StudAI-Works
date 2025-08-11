@@ -72,7 +72,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold">Welcome to Nexus</h1>
+        <h1 className="text-4xl font-bold">Welcome to StudAI Builder</h1>
         <p className="text-muted-foreground">
           You clicked {count} times
         </p>
@@ -262,7 +262,7 @@ const headerUser = {
                 <TabsContent value="preview" className="p-0 h-full">
                   <div className="h-full bg-white dark:bg-gray-900 flex items-center justify-center">
                     <div className="text-center space-y-4">
-                      <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Welcome to Nexus</h1>
+                      <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Welcome to StudAI Builder</h1>
                       <p className="text-gray-600 dark:text-gray-400">You clicked 0 times</p>
                       <Button>Click me</Button>
                     </div>

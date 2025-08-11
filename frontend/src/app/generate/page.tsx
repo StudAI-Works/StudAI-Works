@@ -52,10 +52,10 @@ const quickActions = [
   { icon: Smartphone, label: "Mobile App UI", description: "Responsive mobile interface" },
 ];
 const starterTemplates = [
-  { name: "Next.js", description: "Build full-stack React apps", icon: "⚡", color: "bg-black text-white" },
-  { name: "Supabase", description: "Spin up Postgres with auth", icon: "🟢", color: "bg-green-600 text-white" },
-  { name: "Neon", description: "Start with Serverless Postgres", icon: "🔵", color: "bg-blue-600 text-white" },
-  { name: "Upstash", description: "Get started with Serverless Redis", icon: "🔴", color: "bg-red-600 text-white" },
+  { name: "Website Template", description: "A ready-made site you can customize without coding.", icon: "🌐", color: "bg-blue-500 text-white" },
+  { name: "Blog Template", description: "Quickly start a blog — just change text and images.", icon: "📝", color: "bg-green-500 text-white" },
+  { name: "Online Store", description: "Launch your own online shop in minutes.", icon: "🛍️", color: "bg-pink-500 text-white" },
+  { name: "Portfolio", description: "Showcase your work in a professional layout.", icon: "🎨", color: "bg-purple-500 text-white" },
 ];
 
 // Boilerplate HTML
