@@ -63,7 +63,7 @@ class ConversationRequest(BaseModel):
 class ConversationResponse(BaseModel):
     reply: str
     session_id: str
-
+    work_summary: str | None = None
 
 class GenerateRequest(BaseModel):
     session_id: str
@@ -360,25 +360,30 @@ User's change request:
 {request.message}
 
 Rules:
-- Keep the file name exactly the same.
+- Keep the file name exactly the same as per the directory.
 - Only apply the requested changes.
 - Preserve coding style, formatting, and imports from the existing file.
 - Return the changed file(s) in this EXACT markdown format:
 
 #### filename.ext
 //updated content here
+
+Additionally, after the code files, ALWAYS include a file named 'Work.txt' in the same markdown format:
+#### Work.txt
+A summary of what you changed, and any next steps or instructions for the user (e.g., "Get an API key and add it to .env", "Run npm install", etc.)
 """
     edit_resp = await asyncio.to_thread(
         lambda: gemini_model.generate_content([{"role": "user", "parts": [edit_prompt]}])
     )
 
     updated_files = parse_markdown_to_dict(edit_resp.text)
+    work_summary = updated_files.get("Work.txt") 
     for fpath, content in updated_files.items():
         all_files[fpath] = content
     session_data["files"] = all_files
     CONVERSATION_SESSIONS[request.session_id] = session_data
 
-    return ConversationResponse(reply=edit_resp.text.strip(), session_id=request.session_id)
+    return ConversationResponse(reply=edit_resp.text.strip(), session_id=request.session_id,work_summary=work_summary)
 
 
 

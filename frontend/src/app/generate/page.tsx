@@ -1177,6 +1177,7 @@ const handleSend = async (prompt?: string) => {
       const data = await res.json();
       if (hasGenerated) {
         const refinedFiles = parseAIResponse(data.reply);
+        const summary= data.work_summary || "";
         if (refinedFiles.length > 0) {
           // Merge refined files into existing files (
           // replace only changed files)
@@ -1192,6 +1193,7 @@ const handleSend = async (prompt?: string) => {
           // Optionally maintain selectedFile and expandedFolders state,
           // or update if refined files contain the selected file
         }
+        setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: summary, timestamp: new Date() }]);
         toast.update(loadingToastId, { render: "Code updated!", type: "success", isLoading: false, autoClose: 2000 });
       }
       else {
