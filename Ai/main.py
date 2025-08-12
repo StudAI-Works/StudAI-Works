@@ -161,28 +161,55 @@ CODE_GEN_PLAN = {
 "Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
 }
 
+import re
+
 def parse_markdown_to_dict(markdown: str):
-    file_pattern = r'#### (.+?)\s*\n```(?:[a-zA-Z0-9]*)\s*\n([\s\S]*?)```'
+    """
+    Parses AI-generated markdown containing multiple file sections:
+    #### filename.ext
+    ```
+    file content
+    ```
+    Returns a dict { "filename.ext": "file content" }
+    """
+    # Allow optional language after ```
+    file_pattern = r'####\s+(.+?)\s*\r?\n```[ \t]*([a-zA-Z0-9+\-_.]*)?\s*\r?\n([\s\S]*?)```'
     files = {}
     for match in re.finditer(file_pattern, markdown, re.DOTALL):
-        path, content = match.groups()
-        files[path.strip()] = content.strip()
+        path = match.group(1).strip()
+        content = match.group(3).strip()
+        files[path] = content
+    print(f"Parsed {len(files)} files from markdown.")
+    print("files are:",files)  # Log first 5 files for debugging
     return files
 
+
 def extract_project_summary(markdown: str):
-    summary_re = r'## 🔹 Project Overview\s*\n([\s\S]*?)(?:\n---|\Z)'
-    m = re.search(summary_re, markdown, re.DOTALL)
+    """
+    Extracts text under '## Project Overview' or '## 🔹 Project Overview'
+    until a horizontal rule (---, ***) or next '## ' heading.
+    """
+    # Emoji optional, allow both
+    summary_re = r'##\s*(?:🔹\s*)?Project Overview\s*\r?\n([\s\S]*?)(?=\r?\n---|\r?\n\*\*\*|^##\s|\Z)'
+    m = re.search(summary_re, markdown, re.DOTALL | re.MULTILINE)
     if m:
         return m.group(1).strip()
     return ""
 
+
 def extract_readme(markdown_output: str) -> str:
-    pattern = r"#### README\.md\s+```(?:markdown)?\s*([\s\S]*?)```"
-    match = re.search(pattern, markdown_output, re.DOTALL)
+    """
+    Extracts README.md contents from a markdown block:
+    #### README.md
+    ```markdown
+    ...content...
+    ```
+    """
+    pattern = r'####\s+README\.md\s*\r?\n```[ \t]*(?:markdown|md)?[ \t]*\r?\n([\s\S]*?)```'
+    match = re.search(pattern, markdown_output, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
     return ""
-
 
 # --- API Endpoints ---
 @app.get("/")
@@ -214,7 +241,7 @@ async def refine_features(request: ConversationRequest):
             model=AZURE_OPENAI_DEPLOYMENT,
             messages=history,
             temperature=0.7,
-            max_tokens=2000,
+            max_tokens=500,
         )
 
         print(f"Response from AI: {response.choices[0].message.content}")
@@ -255,7 +282,7 @@ async def run_code_generation(request: GenerateRequest) -> str:
                 model=AZURE_OPENAI_DEPLOYMENT_NAME,
                 messages=chat_history,
                 temperature=0.2,
-                max_tokens=10192,
+                max_tokens=502,
             )
             section_response = section_response.choices[0].message.content
             chat_history.append({"role": "assistant", "content": section_response})
@@ -271,7 +298,7 @@ async def run_code_generation(request: GenerateRequest) -> str:
 @app.post("/generate")
 async def generate_code(request: GenerateRequest):
     try:
-        full_output = await run_code_generation(request)
+        full_output = await run_code_generation(request) # Log first 500 chars for debugging
         files_dict = parse_markdown_to_dict(full_output)
         summary = extract_project_summary(full_output)
         readme_content = extract_readme(full_output)
@@ -320,7 +347,7 @@ Return only the file paths, one per line. No explanations.
             {"role": "user", "content": file_list_prompt}
         ],
         temperature=0.2,
-        max_tokens=2000,
+        max_tokens=500,
     )
 
     file_resp = file_resp.choices[0].message.content.strip()
@@ -333,8 +360,9 @@ Return only the file paths, one per line. No explanations.
     files_context = ""
     for fname in affected_files:
         file_content = all_files.get(fname, "")
-        files_context += f"\n#### {fname}\n``````\n"
-
+        files_context += f"\n#### {fname}\n```{get_file_language(fname)}\n{file_content}\n```"
+    print(f"Files to be modified: {affected_files}")
+    print(f"Files context:\n{files_context}")
     # Step 3: Ask AI to edit the files
     edit_prompt = f"""
 You are an expert full-stack developer.
@@ -369,7 +397,7 @@ A summary of what you changed, and any next steps or instructions for the user (
             {"role": "user", "content": edit_prompt}
         ],
         temperature=0.2,
-        max_tokens=8000,
+        max_tokens=500,
     )
 
     edit_resp = edit_resp.choices[0].message.content.strip()
