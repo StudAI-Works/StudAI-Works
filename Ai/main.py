@@ -6,15 +6,17 @@ import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from dotenv import load_dotenv
-import google.generativeai as genai
+import openai
 import re
+from openai import AsyncAzureOpenAI, RateLimitError
+from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
+
 # --- Setup & Configuration ---
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 app = FastAPI(
    title="StudAI Works - Conversational AI Coder",
@@ -22,13 +24,12 @@ app = FastAPI(
    version="5.0.0"
 )
 
-
 app.add_middleware(
-CORSMiddleware,
-allow_origins=["*"],
-allow_credentials=True,
-allow_methods=["*"],
-allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 def get_file_language(filename: str) -> str:
@@ -44,21 +45,40 @@ def get_file_language(filename: str) -> str:
         "md": "markdown",
         "py": "python"
     }.get(ext, "")
-# --- Gemini Client Setup ---
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise RuntimeError("GOOGLE_API_KEY environment variable not set.")
-genai.configure(api_key=GOOGLE_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
+# --- Azure OpenAI Client Setup ---
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
+AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")  # e.g. "gpt-4-1"
+print(f"AZURE_OPENAI_ENDPOINT: {AZURE_OPENAI_ENDPOINT}")
+print(f"AZURE_OPENAI_KEY: {AZURE_OPENAI_KEY}")  
+print(f"AZURE_OPENAI_DEPLOYMENT: {AZURE_OPENAI_DEPLOYMENT}")
+if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_KEY or not AZURE_OPENAI_DEPLOYMENT:
+    raise RuntimeError("Azure OpenAI environment variables not set.")
+
+openai.api_type = "azure"
+openai.api_base = AZURE_OPENAI_ENDPOINT
+openai.api_key = AZURE_OPENAI_KEY
+openai.api_version = "2024-02-15-preview"  # Use the correct API version for GPT-4.1
+
+
+# --- AI Client Setup ---
+client = AsyncAzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_KEY"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+)
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
 # --- In-Memory Session Storage ---
 CONVERSATION_SESSIONS = {}
 
+# CONVERSATION_REFINEMENT: Dict[str, List[Dict[str, str]]] = {}
+# CONVERSATION_GENERATION: Dict[str, List[Dict[str, str]]] = {}
+
 class ConversationRequest(BaseModel):
     session_id: str
     message: str
-
 
 class ConversationResponse(BaseModel):
     reply: str
@@ -68,17 +88,14 @@ class ConversationResponse(BaseModel):
 class GenerateRequest(BaseModel):
     session_id: str
 
-
 class StartResponse(BaseModel):
     session_id: str
     message: str
-
 
 # --- System Prompts ---
 REFINEMENT_SYSTEM_PROMPT = """
 You are a friendly and brilliant project manager. Your goal is to talk to the user and help them clarify the features for a web application they want to build. Ask clarifying questions, suggest features, and help them create a solid plan. Keep your responses concise and guide the conversation forward. Once you feel the plan is clear, confirm with the user if they are ready to generate the code. Keep in mind that this is for a future prompt.
 """
-
 
 CODE_GEN_SYSTEM_PROMPT = """
 You are an expert Full-Stack Developer with 25+ years of experience. Your task is to generate a complete, production-grade, and well-documented web application based on the provided conversation history.
@@ -143,17 +160,8 @@ CODE_GEN_PLAN = {
 "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme",
 "Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
 }
-import re
+
 def parse_markdown_to_dict(markdown: str):
-    """
-    Extracts code files from markdown output in format:
-    #### path/to/file.ext
-    ```<optional lang>
-    ...content...
-    ```
-    Returns dict: {file_path: content}
-    """
-    # Matches: #### filename\n```[optional lang]\n(content)\n```
     file_pattern = r'#### (.+?)\s*\n```(?:[a-zA-Z0-9]*)\s*\n([\s\S]*?)```'
     files = {}
     for match in re.finditer(file_pattern, markdown, re.DOTALL):
@@ -162,10 +170,6 @@ def parse_markdown_to_dict(markdown: str):
     return files
 
 def extract_project_summary(markdown: str):
-    """
-    Pull Project Overview section from markdown output.
-    Looks for "## 🔹 Project Overview" ... until next "---"
-    """
     summary_re = r'## 🔹 Project Overview\s*\n([\s\S]*?)(?:\n---|\Z)'
     m = re.search(summary_re, markdown, re.DOTALL)
     if m:
@@ -173,119 +177,97 @@ def extract_project_summary(markdown: str):
     return ""
 
 def extract_readme(markdown_output: str) -> str:
-    """
-    Extracts README.md content from markdown output formatted like:
-    #### README.md
-    ```markdown
-    ...content...
-    ```
-    """
     pattern = r"#### README\.md\s+```(?:markdown)?\s*([\s\S]*?)```"
     match = re.search(pattern, markdown_output, re.DOTALL)
-    print(match)
     if match:
         return match.group(1).strip()
     return ""
+
+
 # --- API Endpoints ---
 @app.get("/")
 async def root():
     return {"message": "Conversational AI Coder is running!", "status": "healthy"}
-
-
 @app.post("/start-conversation", response_model=StartResponse)
 async def start_conversation():
     session_id = str(uuid.uuid4())
     initial_message = "Hello! I'm here to help you plan your web application. What are you thinking of building today?"
+    print(f"Starting new conversation with session ID: {session_id}")
     CONVERSATION_SESSIONS[session_id] = [
         {"role": "system", "content": REFINEMENT_SYSTEM_PROMPT},
         {"role": "assistant", "content": initial_message}
     ]
     logger.info(f"New conversation started: {session_id}")
     return StartResponse(session_id=session_id, message=initial_message)
-
-
-
-
 @app.post("/refine", response_model=ConversationResponse)
 async def refine_features(request: ConversationRequest):
     if request.session_id not in CONVERSATION_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found.")
-
+    
     history = CONVERSATION_SESSIONS[request.session_id]
     history.append({"role": "user", "content": request.message})
 
-
-    # Prepare messages for Gemini
-    gemini_history = []
-    for m in history:
-        if m["role"] == "system":
-            gemini_history.append({"role": "user", "parts": [m["content"]]})
-        elif m["role"] == "assistant":
-            gemini_history.append({"role": "model", "parts": [m["content"]]})
-        else:
-            gemini_history.append({"role": "user", "parts": [m["content"]]})
-
-
     try:
-        response = await asyncio.to_thread(
-            lambda: gemini_model.generate_content(gemini_history)
+        print(f"Refining features for session {request.session_id} with message: {request.message}")
+        
+        response = await client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT,
+            messages=history,
+            temperature=0.7,
+            max_tokens=2000,
         )
-        reply = response.text
+
+        print(f"Response from AI: {response.choices[0].message.content}")
+        reply = response.choices[0].message.content
         history.append({"role": "assistant", "content": reply})
         CONVERSATION_SESSIONS[request.session_id] = history
+        
         return ConversationResponse(reply=reply, session_id=request.session_id)
     except Exception as e:
         logger.error(f"Error during refinement: {e}")
-    raise HTTPException(status_code=500, detail="AI conversation failed.")
+        raise HTTPException(status_code=500, detail="AI conversation failed.")
 
-
+@retry(
+    wait=wait_random_exponential(min=1, max=20),
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type(RateLimitError)
+)
 # New function: Non-streamed generation
 async def run_code_generation(request: GenerateRequest) -> str:
     if request.session_id not in CONVERSATION_SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found to generate code from.")
 
-
     conversation_history = copy.deepcopy(CONVERSATION_SESSIONS[request.session_id])
 
-
-    # Prepare messages for Gemini
-    gemini_history = [
-        {"role": "user", "parts": [CODE_GEN_SYSTEM_PROMPT]},
-        {"role": "user", "parts": [
+    chat_history = [
+        {"role": "system", "content": CODE_GEN_SYSTEM_PROMPT},
+        {"role": "user", "content":
             "Here is the full conversation history. Please generate the application based on this.\n\n" +
             "\n".join([f"{m['role']}: {m['content']}" for m in conversation_history if m['role'] != 'system'])
-        ]}
+        }
     ]
-
 
     full_output = ""
     try:
         for section_title, section_task in CODE_GEN_PLAN.items():
-            gemini_history.append({"role": "user", "parts": [section_task]})
-
-
-            response = await asyncio.to_thread(
-                lambda: gemini_model.generate_content(gemini_history)
+            chat_history.append({"role": "user", "content": section_task})
+            section_response = await client.chat.completions.create(
+                model=AZURE_OPENAI_DEPLOYMENT_NAME,
+                messages=chat_history,
+                temperature=0.2,
+                max_tokens=10192,
             )
-
-
-            section_response = response.text
-            gemini_history.append({"role": "model", "parts": [section_response]})
-
-            
-            CONVERSATION_SESSIONS[request.session_id] = conversation_history + gemini_history
+            section_response = section_response.choices[0].message.content
+            chat_history.append({"role": "assistant", "content": section_response})
+            CONVERSATION_SESSIONS[request.session_id] = conversation_history + chat_history
             full_output += f"\n\n---\n## 🔹 {section_title}\n\n{section_response}"
-
 
     except Exception as e:
         logger.error(f"Error during generation: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error during code generation: {str(e)}")
 
-
     return full_output
 
-
-# Final API endpoint
 @app.post("/generate")
 async def generate_code(request: GenerateRequest):
     try:
@@ -293,7 +275,6 @@ async def generate_code(request: GenerateRequest):
         files_dict = parse_markdown_to_dict(full_output)
         summary = extract_project_summary(full_output)
         readme_content = extract_readme(full_output)
-        # Always store session as a dict
         old_session = CONVERSATION_SESSIONS.get(request.session_id)
         if isinstance(old_session, dict):
             session = old_session
@@ -307,9 +288,7 @@ async def generate_code(request: GenerateRequest):
         return Response(content=full_output, media_type='text/markdown')
     except Exception as e:
         logger.error(f"Error during generation: {str(e)}")
-        logger.error(f"Error during generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/parse-text", response_model=ConversationResponse)
 async def parse_text(request: ConversationRequest):
     session_data = CONVERSATION_SESSIONS.get(request.session_id)
@@ -317,10 +296,9 @@ async def parse_text(request: ConversationRequest):
         raise HTTPException(status_code=404, detail="Session or project not found.")
 
     readme_content = session_data["readme"]
-    print(f"Using README content for session {request.session_id}:\n{readme_content[:100]}...")  # Log first 100 chars
     all_files = session_data["files"]
-    print(f"Parsing text for session {request.session_id} with {len(all_files)} files.")
-    # STEP 1: Figure out affected file(s)
+
+    # Step 1: Ask AI which files to modify
     file_list_prompt = f"""
 Project README.md:
 {readme_content}
@@ -333,20 +311,31 @@ From the project files list below, identify exactly which file(s) should be modi
 
 Return only the file paths, one per line. No explanations.
 """
-    files_resp = await asyncio.to_thread(
-        lambda: gemini_model.generate_content([{"role": "user", "parts": [file_list_prompt]}])
+
+    # FIX — messages should be a list of dicts, not a raw string
+    file_resp = await client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT_NAME,
+        messages=[
+            {"role": "system", "content": "You are an AI that can read project context and identify relevant files."},
+            {"role": "user", "content": file_list_prompt}
+        ],
+        temperature=0.2,
+        max_tokens=2000,
     )
-    affected_files = [f.strip() for f in files_resp.text.splitlines() if f.strip() in all_files]
+
+    file_resp = file_resp.choices[0].message.content.strip()
+    affected_files = [f.strip() for f in file_resp.splitlines() if f.strip() in all_files]
 
     if not affected_files:
         raise HTTPException(status_code=400, detail="Could not determine affected files.")
-    print(f"Affected files for session {request.session_id}: {affected_files}")
-    # STEP 2: Give LLM README + only relevant file(s)
+
+    # Step 2: Collect file contents for editing
     files_context = ""
     for fname in affected_files:
         file_content = all_files.get(fname, "")
-        files_context += f"\n#### {fname}\n```{get_file_language(fname)}\n{file_content}\n```\n"
-    print(f"Files context for session {request.session_id}:\n{files_context}...")  # Log first 1000 chars
+        files_context += f"\n#### {fname}\n``````\n"
+
+    # Step 3: Ask AI to edit the files
     edit_prompt = f"""
 You are an expert full-stack developer.
 
@@ -372,22 +361,29 @@ Additionally, after the code files, ALWAYS include a file named 'Work.txt' in th
 #### Work.txt
 A summary of what you changed, and any next steps or instructions for the user (e.g., "Get an API key and add it to .env", "Run npm install", etc.)
 """
-    edit_resp = await asyncio.to_thread(
-        lambda: gemini_model.generate_content([{"role": "user", "parts": [edit_prompt]}])
+
+    edit_resp = await client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT_NAME,
+        messages=[
+            {"role": "system", "content": "You are an expert full-stack developer who can modify project files based on user requests."},
+            {"role": "user", "content": edit_prompt}
+        ],
+        temperature=0.2,
+        max_tokens=8000,
     )
 
-    updated_files = parse_markdown_to_dict(edit_resp.text)
-    work_summary = updated_files.get("Work.txt") 
+    edit_resp = edit_resp.choices[0].message.content.strip()
+    updated_files = parse_markdown_to_dict(edit_resp)
+    work_summary = updated_files.get("Work.txt")
+
+    # Step 4: Update session with new file contents
     for fpath, content in updated_files.items():
         all_files[fpath] = content
     session_data["files"] = all_files
     CONVERSATION_SESSIONS[request.session_id] = session_data
 
-    return ConversationResponse(reply=edit_resp.text.strip(), session_id=request.session_id,work_summary=work_summary)
-
-
+    return ConversationResponse(reply=edit_resp, session_id=request.session_id, work_summary=work_summary)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
