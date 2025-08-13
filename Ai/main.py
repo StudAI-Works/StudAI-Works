@@ -43,7 +43,8 @@ def get_file_language(filename: str) -> str:
         "json": "json",
         "html": "html",
         "md": "markdown",
-        "py": "python"
+        "py": "python",
+        "txt": "plaintext",
     }.get(ext, "")
 
 # --- Azure OpenAI Client Setup ---
@@ -173,10 +174,23 @@ def parse_markdown_to_dict(markdown: str):
     Returns a dict { "filename.ext": "file content" }
     """
     # Allow optional language after ```
+    print("Parsing markdown to extract files...",markdown)
     file_pattern = r'####\s+(.+?)\s*\r?\n```[ \t]*([a-zA-Z0-9+\-_.]*)?\s*\r?\n([\s\S]*?)```'
     files = {}
     for match in re.finditer(file_pattern, markdown, re.DOTALL):
-        path = match.group(1).strip()
+        raw_path = match.group(1).strip()
+        
+        # Normalize case for README.md
+        path = raw_path.strip()
+        if path.lower().startswith("readme"):
+            path = "README.md"
+        
+        # Remove accidental double extension ".md.md"
+        if path.lower().endswith(".md.md"):
+            path = path[:-3]
+
+        # Ensure no accidental absolute paths or backslashes
+        path = path.replace("\\", "/").lstrip("/")
         content = match.group(3).strip()
         files[path] = content
     print(f"Parsed {len(files)} files from markdown.")
@@ -205,7 +219,7 @@ def extract_readme(markdown_output: str) -> str:
     ...content...
     ```
     """
-    pattern = r'####\s+README\.md\s*\r?\n```[ \t]*(?:markdown|md)?[ \t]*\r?\n([\s\S]*?)```'
+    pattern = r'#+\s*(?:🔹\s*)?README\.md\s*\r?\n([\s\S]*?)(?=\r?\n#+\s|\Z)'
     match = re.search(pattern, markdown_output, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
@@ -241,7 +255,7 @@ async def refine_features(request: ConversationRequest):
             model=AZURE_OPENAI_DEPLOYMENT,
             messages=history,
             temperature=0.7,
-            max_tokens=500,
+            max_tokens=100,
         )
 
         print(f"Response from AI: {response.choices[0].message.content}")
@@ -282,7 +296,7 @@ async def run_code_generation(request: GenerateRequest) -> str:
                 model=AZURE_OPENAI_DEPLOYMENT_NAME,
                 messages=chat_history,
                 temperature=0.2,
-                max_tokens=502,
+                max_tokens=10192,
             )
             section_response = section_response.choices[0].message.content
             chat_history.append({"role": "assistant", "content": section_response})
@@ -302,6 +316,7 @@ async def generate_code(request: GenerateRequest):
         files_dict = parse_markdown_to_dict(full_output)
         summary = extract_project_summary(full_output)
         readme_content = extract_readme(full_output)
+        print("Readme content extracted:", readme_content[:500])  # Log first 500 chars for debugging
         old_session = CONVERSATION_SESSIONS.get(request.session_id)
         if isinstance(old_session, dict):
             session = old_session
@@ -378,16 +393,23 @@ User's change request:
 
 Rules:
 - Keep the file name exactly the same as per the directory.
-- Only apply the requested changes.
+- Only apply the requested changes and output the full file code.
 - Preserve coding style, formatting, and imports from the existing file.
 - Return the changed file(s) in this EXACT markdown format:
 
 #### filename.ext
 //updated content here
 
-Additionally, after the code files, ALWAYS include a file named 'Work.txt' in the same markdown format:
+Additionally, after the code files, ALWAYS include a file named 'Work.txt' in EXACTLY the same markdown format as the other files, so it matches this template:
+
 #### Work.txt
-A summary of what you changed, and any next steps or instructions for the user (e.g., "Get an API key and add it to .env", "Run npm install", etc.)
+<A summary of what you changed, and any next steps or instructions for the user (e.g., "Get an API key and add it to .env", "Run npm install", etc.)>```
+Rules for Work.txt:
+
+Use "plaintext" after the triple backticks.
+Do NOT skip the opening or closing triple backticks.
+Do NOT add extra headings or text outside the fenced block.
+This formatting is mandatory so the file is machine‑parsed.
 """
 
     edit_resp = await client.chat.completions.create(
@@ -397,13 +419,13 @@ A summary of what you changed, and any next steps or instructions for the user (
             {"role": "user", "content": edit_prompt}
         ],
         temperature=0.2,
-        max_tokens=500,
+        max_tokens=5000,
     )
 
     edit_resp = edit_resp.choices[0].message.content.strip()
     updated_files = parse_markdown_to_dict(edit_resp)
     work_summary = updated_files.get("Work.txt")
-
+    print("Work summary:", work_summary)
     # Step 4: Update session with new file contents
     for fpath, content in updated_files.items():
         all_files[fpath] = content

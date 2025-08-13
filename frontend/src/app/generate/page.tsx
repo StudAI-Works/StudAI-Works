@@ -1193,8 +1193,7 @@ const handleSend = async (prompt?: string) => {
           // Optionally maintain selectedFile and expandedFolders state,
           // or update if refined files contain the selected file
         }
-        if(summary !== ""){
-        setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: summary, timestamp: new Date() }]);}
+        setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: summary, timestamp: new Date() }]);
         toast.update(loadingToastId, { render: "Code updated!", type: "success", isLoading: false, autoClose: 2000 });
       }
       else {
