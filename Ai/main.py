@@ -426,6 +426,8 @@ This formatting is mandatory so the file is machine‑parsed.
     updated_files = parse_markdown_to_dict(edit_resp)
     work_summary = updated_files.get("Work.txt")
     print("Work summary:", work_summary)
+    if work_summary:
+        work_summary = work_summary.removeprefix("plaintext").lstrip()
     # Step 4: Update session with new file contents
     for fpath, content in updated_files.items():
         all_files[fpath] = content

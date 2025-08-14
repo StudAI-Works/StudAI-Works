@@ -18,7 +18,7 @@ import { Navigate } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview,useSandpack,useSandpackConsole } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { se } from "date-fns/locale";
@@ -40,6 +40,80 @@ interface FileTreeNode {
   type: "file" | "folder";
   children?: FileTreeNode[];
 }
+
+
+const ErrorListener = ({ onFix }: { onFix: (errorMessage: string) => void }) => {
+  const { sandpack } = useSandpack();
+  const clientId = Object.keys(sandpack.clients)[0];
+
+  const { logs } = useSandpackConsole({
+    clientId,
+    resetOnPreviewRestart: true,
+  });
+
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const errorMessages = logs
+    .filter((log) => log.method === "error" && Array.isArray(log.data))
+    .flatMap((log) => log.data);
+
+  const combinedErrorMessage = errorMessages.join("\n");
+
+  useEffect(() => {
+    const foundError = logs.some((log) => log.method === "error" && log.data.length > 0);
+    setHasError(foundError);
+
+    if (foundError) {
+      setErrorMessage(errorMessages.join(" "));
+    } else {
+      setErrorMessage(null);
+    }
+  }, [logs]);
+
+  if (!hasError) return null;
+
+  return (
+    <>
+      <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 999 }}>
+        <button
+          onClick={() => onFix(combinedErrorMessage)}
+          style={{
+            background: "#EF4444",
+            color: "white",
+            border: "none",
+            padding: "10px 16px",
+            borderRadius: 8,
+            cursor: "pointer",
+            boxShadow: "0px 4px 8px rgba(0,0,0,0.2)",
+            fontWeight: "bold",
+          }}
+        >
+          Fix Error
+        </button>
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          bottom: 60,
+          right: 16,
+          background: "#1F2937",
+          color: "white",
+          padding: "8px 12px",
+          borderRadius: 6,
+          maxWidth: 300,
+          fontSize: 13,
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        {errorMessage}
+      </div>
+    </>
+  );
+};
+
+
 
 // Constant Arrays
 const quickActions = [
@@ -1595,6 +1669,13 @@ const handleSend = async (prompt?: string) => {
                           }
                         }}
                       >
+                        
+                                       <ErrorListener
+          onFix={(errorMessage) =>
+            handleSend(`Refine the code to fix the following error:\n${errorMessage}`)
+          }
+        />
+
                         <SandpackLayout style={{height:"800px"}}>
                             <SandpackCodeEditor style={{ height: "800px" }} />
                             <SandpackPreview style={{ height: "800px" }} />
