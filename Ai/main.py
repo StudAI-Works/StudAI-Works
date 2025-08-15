@@ -51,9 +51,6 @@ def get_file_language(filename: str) -> str:
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")  # e.g. "gpt-4-1"
-print(f"AZURE_OPENAI_ENDPOINT: {AZURE_OPENAI_ENDPOINT}")
-print(f"AZURE_OPENAI_KEY: {AZURE_OPENAI_KEY}")  
-print(f"AZURE_OPENAI_DEPLOYMENT: {AZURE_OPENAI_DEPLOYMENT}")
 if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_KEY or not AZURE_OPENAI_DEPLOYMENT:
     raise RuntimeError("Azure OpenAI environment variables not set.")
 
@@ -105,21 +102,6 @@ You are an expert Full-Stack Developer with 25+ years of experience. Your task i
 The user and a project manager have already discussed the features. Your job is to read their entire conversation and build the application exactly as specified.
 ###You need to use CSS not tailwind and also you need to generate it inside the index.css file not in any other files and the website modren look like a webiste that goning to come look beautiful and naturally with that much styles and animations and make sure one more time everyting importted perfectly tis is very important
 
-
-### prefix the code without this error Something went wrong
-
-
-/src/store/useAppStore.ts: (0 , _zustand.default) is not a function (80:38)
-
-
-  updateNotification: (n: Notification) => void;
-  | }
-  | 
-> | const useAppStore = create<AppState>((set) => ({
-                                                ^
-  |   currentScreen: 'dashboard',
-  |   setCurrentScreen: (screen) => set({ currentScreen: screen }),
-  | 
 ### 🔧 Tech Stack
 - Frontend: React (TypeScript) + CSS + Vite (Unless specified otherwise in history)
 - make sure to include all necessary files to be able to download and run this project like index.html or index.tsx etc
@@ -141,74 +123,56 @@ Use markdown headers like:
 ```typescript
 // code here
 ```
+#### README.md
+```markdown
+// README content here
+```
 > All frontend-related files (e.g., `vite.config.ts`, `tsconfig.json`, `tailwind.config.cjs`, `index.html`, `package.json`) must be under the `frontend/` folder.  
 > All backend files (e.g., `requirements.txt`, `main.py`, `pyproject.toml`) must be under the `backend/` folder.  
 > No files should exist at the project root except the `README.md`.
 ---
 
-
-1. **Project Overview**: A high-level description based on the conversation.
-2. **Folder Structure**: A markdown tree(Always include in README.md).
-3. **Code Files**: All frontend and backend code. Use markdown headers for each file path (e.g., `#### path/to/file.ext`).
-4. **README.md**: Complete setup and run instructions.
+1. **Folder Structure**: A markdown tree(include within README.md).
+2. **Code Files**: All frontend and backend code. Use markdown headers for each file path (e.g., `#### path/to/file.ext`).
+3. **README.md**: Complete setup and run instructions.(All readme content should use ... instead of ```).
 """
 
-
 CODE_GEN_PLAN = {
-"Project Overview": "First, provide the 'Project Overview'. Summarize the app's features based on the entire conversation history.",
-"Folder Structure": "Next, generate the complete 'Folder Structure' in a markdown tree format.",
-"Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header as well as make sure to include all files like index etc so that no import fails as well as make sure of having all necessary libraries in the package.json for frontend.",
-"README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme",
-"Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
+    "Project Overview": (
+        "Write the 'Project Overview' section as plain markdown text that will go INSIDE README.md. "
+        "Do not output it as a separate file or with a 4-hash header."
+    ),
+    "Folder Structure": (
+        "Write the complete 'Folder Structure' as a markdown code block inside README.md under the heading '## 📂 Folder Structure' and start body with ... instead of ```. "
+        "Do not output it as a file or with a 4-hash header."
+    ),
+    "Code Files": (
+        "Now, output all frontend and backend code files. Each code file MUST be in its own markdown block "
+        "with a `#### path/to/file.ext` header. Ensure all imports work."
+    ),
+    "README.md": (
+        "Finally, output the full README.md file as a single block, with '#### README.md' followed by the full markdown "
+        "including 'Project Overview' and 'Folder Structure' inside it."
+    ),
+    "Validate Project": (
+        "Double-check the project is complete and functional. Ensure all important files exist. "
+        "Output the validation checklist in plain markdown, not as a file."
+    )
 }
 
 import re
 
 def parse_markdown_to_dict(markdown: str):
-    """
-    Parses AI-generated markdown containing multiple file sections:
-    #### filename.ext
-    ```
-    file content
-    ```
-    Returns a dict { "filename.ext": "file content" }
-    """
-    # Allow optional language after ```
-    print("Parsing markdown to extract files...",markdown)
     file_pattern = r'####\s+(.+?)\s*\r?\n```[ \t]*([a-zA-Z0-9+\-_.]*)?\s*\r?\n([\s\S]*?)```'
     files = {}
     for match in re.finditer(file_pattern, markdown, re.DOTALL):
         raw_path = match.group(1).strip()
-        
-        # Normalize case for README.md
-        path = raw_path.strip()
-        if path.lower().startswith("readme"):
-            path = "README.md"
-        
-        # Remove accidental double extension ".md.md"
-        if path.lower().endswith(".md.md"):
-            path = path[:-3]
-
+        path= raw_path.strip()  # Replace spaces with underscores for file paths
         # Ensure no accidental absolute paths or backslashes
         path = path.replace("\\", "/").lstrip("/")
         content = match.group(3).strip()
         files[path] = content
-    print(f"Parsed {len(files)} files from markdown.")
-    print("files are:",files)  # Log first 5 files for debugging
     return files
-
-
-def extract_project_summary(markdown: str):
-    """
-    Extracts text under '## Project Overview' or '## 🔹 Project Overview'
-    until a horizontal rule (---, ***) or next '## ' heading.
-    """
-    # Emoji optional, allow both
-    summary_re = r'##\s*(?:🔹\s*)?Project Overview\s*\r?\n([\s\S]*?)(?=\r?\n---|\r?\n\*\*\*|^##\s|\Z)'
-    m = re.search(summary_re, markdown, re.DOTALL | re.MULTILINE)
-    if m:
-        return m.group(1).strip()
-    return ""
 
 
 def extract_readme(markdown_output: str) -> str:
@@ -219,7 +183,7 @@ def extract_readme(markdown_output: str) -> str:
     ...content...
     ```
     """
-    pattern = r'#+\s*(?:🔹\s*)?README\.md\s*\r?\n([\s\S]*?)(?=\r?\n#+\s|\Z)'
+    pattern = r'####+\s*(?:🔹\s*)?README\.md\s*\r?\n([\s\S]*?)(?=\r?\n#+\s|\Z)'
     match = re.search(pattern, markdown_output, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
@@ -233,7 +197,6 @@ async def root():
 async def start_conversation():
     session_id = str(uuid.uuid4())
     initial_message = "Hello! I'm here to help you plan your web application. What are you thinking of building today?"
-    print(f"Starting new conversation with session ID: {session_id}")
     CONVERSATION_SESSIONS[session_id] = [
         {"role": "system", "content": REFINEMENT_SYSTEM_PROMPT},
         {"role": "assistant", "content": initial_message}
@@ -249,7 +212,6 @@ async def refine_features(request: ConversationRequest):
     history.append({"role": "user", "content": request.message})
 
     try:
-        print(f"Refining features for session {request.session_id} with message: {request.message}")
         
         response = await client.chat.completions.create(
             model=AZURE_OPENAI_DEPLOYMENT,
@@ -257,8 +219,6 @@ async def refine_features(request: ConversationRequest):
             temperature=0.7,
             max_tokens=100,
         )
-
-        print(f"Response from AI: {response.choices[0].message.content}")
         reply = response.choices[0].message.content
         history.append({"role": "assistant", "content": reply})
         CONVERSATION_SESSIONS[request.session_id] = history
@@ -299,6 +259,7 @@ async def run_code_generation(request: GenerateRequest) -> str:
                 max_tokens=10192,
             )
             section_response = section_response.choices[0].message.content
+            logger.info(f"Generated section '{section_title}': {section_response}...")  # Log first 500 chars for debugging
             chat_history.append({"role": "assistant", "content": section_response})
             CONVERSATION_SESSIONS[request.session_id] = conversation_history + chat_history
             full_output += f"\n\n---\n## 🔹 {section_title}\n\n{section_response}"
@@ -314,16 +275,13 @@ async def generate_code(request: GenerateRequest):
     try:
         full_output = await run_code_generation(request) # Log first 500 chars for debugging
         files_dict = parse_markdown_to_dict(full_output)
-        summary = extract_project_summary(full_output)
         readme_content = extract_readme(full_output)
-        print("Readme content extracted:", readme_content[:500])  # Log first 500 chars for debugging
         old_session = CONVERSATION_SESSIONS.get(request.session_id)
         if isinstance(old_session, dict):
             session = old_session
         else:
             session = {}
         session["files"] = files_dict
-        session["summary"] = summary
         session["readme"] = readme_content
         session["full_markdown"] = full_output
         CONVERSATION_SESSIONS[request.session_id] = session
@@ -376,8 +334,6 @@ Return only the file paths, one per line. No explanations.
     for fname in affected_files:
         file_content = all_files.get(fname, "")
         files_context += f"\n#### {fname}\n```{get_file_language(fname)}\n{file_content}\n```"
-    print(f"Files to be modified: {affected_files}")
-    print(f"Files context:\n{files_context}")
     # Step 3: Ask AI to edit the files
     edit_prompt = f"""
 You are an expert full-stack developer.
@@ -425,7 +381,7 @@ This formatting is mandatory so the file is machine‑parsed.
     edit_resp = edit_resp.choices[0].message.content.strip()
     updated_files = parse_markdown_to_dict(edit_resp)
     work_summary = updated_files.get("Work.txt")
-    print("Work summary:", work_summary)
+    
     if work_summary:
         work_summary = work_summary.removeprefix("plaintext").lstrip()
     # Step 4: Update session with new file contents

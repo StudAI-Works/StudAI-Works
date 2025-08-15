@@ -1165,7 +1165,7 @@ export default fallbackFunction;`;
       const lines = section.split('\n');
       const title = lines[0].replace('## 🔹 ', '').trim();
       const content = lines.slice(1).join('\n').trim();
-      if (title !== 'Code Files' && content) {
+      if (title !== 'Code Files' && content && title!== 'README.md') {
         files.push({ path: `${title.toLowerCase().replace(/\s+/g, '-')}.md`, content });
       }
     });
