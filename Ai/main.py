@@ -1,28 +1,62 @@
-# file: src/fastapi/main.py
+"""
+StudAI Works - AI Service
+Merged: Harsha's Phase 1 + Phase 2/3 + Advanced refinement & file-editing features
+"""
+
 import os
 import copy
 import asyncio
 import logging
 import uuid
+import time
+import re
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from dotenv import load_dotenv
-from openai import AsyncAzureOpenAI, RateLimitError
-from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
+from typing import Optional, Dict, List
+from openai import AzureOpenAI, AsyncAzureOpenAI, OpenAIError, RateLimitError
+from tenacity import retry, stop_after_attempt, wait_random_exponential, wait_exponential, retry_if_exception_type
 
-# --- Setup & Configuration ---
+# -------------------------
+# Load environment variables
+# -------------------------
 load_dotenv()
+
+AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
+
+if not all([AZURE_OPENAI_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT_NAME, AZURE_OPENAI_API_VERSION]):
+    raise ValueError("Missing Azure OpenAI configuration in environment variables")
+
+# -------------------------
+# Logging
+# -------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ANSI colors for terminal visibility
+BLUE = "\033[94m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+MAGENTA = "\033[95m"
+RESET = "\033[0m"
+
+# -------------------------
+# FastAPI app
+# -------------------------
 app = FastAPI(
-    title="StudAI Works - Conversational AI Coder",
-    description="A conversational service to first refine features and then generate code.",
-    version="5.0.0"
+    title="StudAI Works - AI Service",
+    description="AI-powered iterative code generation with refinement and file editing",
+    version="4.0.0"
 )
 
+# -------------------------
+# CORS
+# -------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,21 +65,69 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- AI Client Setup ---
-client = AsyncAzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+# -------------------------
+# Azure OpenAI Clients
+# -------------------------
+client = AzureOpenAI(
+    api_key=AZURE_OPENAI_KEY,
+    api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT
 )
-AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
-# --- In-Memory Session Storage ---
-CONVERSATION_SESSIONS = {}
+async_client = AsyncAzureOpenAI(
+    api_key=AZURE_OPENAI_KEY,
+    api_version=AZURE_OPENAI_API_VERSION,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT
+)
 
-# CONVERSATION_REFINEMENT: Dict[str, List[Dict[str, str]]] = {}
-# CONVERSATION_GENERATION: Dict[str, List[Dict[str, str]]] = {}
+# -------------------------
+# Token Throttling
+# -------------------------
+MAX_TOKENS_PER_MIN = 1_000_000
+tokens_used = 0
+token_window_start = time.time()
 
-# --- Pydantic Models ---
+def throttle_tokens(estimated_tokens: int):
+    global tokens_used, token_window_start
+    now = time.time()
+    if now - token_window_start > 60:
+        tokens_used = 0
+        token_window_start = now
+    tokens_used += estimated_tokens
+    if tokens_used > MAX_TOKENS_PER_MIN:
+        sleep_time = 60 - (now - token_window_start)
+        logger.warning(f"Throttling: sleeping for {sleep_time:.2f}s")
+        time.sleep(sleep_time)
+        tokens_used = estimated_tokens
+        token_window_start = time.time()
+
+# -------------------------
+# In-Memory Session Storage
+# -------------------------
+sessions: Dict[str, Dict] = {}
+CONVERSATION_SESSIONS: Dict[str, List[Dict[str, str]]] = {}
+
+# -------------------------
+# Pydantic Schemas
+# -------------------------
+class GenerateRequest(BaseModel):
+    userInput: str
+    sessionId: Optional[str] = None
+    followUp: Optional[str] = None
+
+class GenerateResponse(BaseModel):
+    sessionId: str
+    generatedPrompt: str
+    generatedCode: str
+
+class ChatRequest(BaseModel):
+    sessionId: Optional[str] = None
+    message: str
+
+class FollowupRequest(BaseModel):
+    sessionId: str
+    followUp: str
+
 class ConversationRequest(BaseModel):
     session_id: str
     message: str
@@ -53,165 +135,288 @@ class ConversationRequest(BaseModel):
 class ConversationResponse(BaseModel):
     reply: str
     session_id: str
-
-class GenerateRequest(BaseModel):
-    session_id: str
+    work_summary: str | None = None
 
 class StartResponse(BaseModel):
     session_id: str
     message: str
 
-# --- System Prompts ---
-REFINEMENT_SYSTEM_PROMPT = """
-You are a friendly and brilliant project manager. Your goal is to talk to the user and help them clarify the features for a web application they want to build. Ask clarifying questions, suggest features, and help them create a solid plan. Keep your responses concise and guide the conversation forward. Once you feel the plan is clear, confirm with the user if they are ready to generate the code. Keep in mind that this is for a future prompt.
-"""
+# -------------------------
+# Prompt Templates
+# -------------------------
+def create_base_prompt(user_input: str) -> str:
+    return f"""
+You are an expert Full-Stack Developer and Prompt Engineer with 25+ years of experience.
 
-CODE_GEN_SYSTEM_PROMPT = """
-You are an expert Full-Stack Developer with 25+ years of experience. Your task is to generate a complete, production-grade, and well-documented web application based on the provided conversation history.
+Your task is to generate **production-grade, modular, scalable, and well-documented** code for a full-stack web application described below.
 
-The user and a project manager have already discussed the features. Your job is to read their entire conversation and build the application exactly as specified.
-###You need to use CSS not tailwind and also you need to generate it inside the index.css file not in any other files and the website modren look like a webiste that goning to come look beautiful and naturally with that much styles and animations and make sure one more time everyting importted perfectly tis is very important
-
-### prefix the code without this error Something went wrong
-
-/src/store/useAppStore.ts: (0 , _zustand.default) is not a function (80:38)
-
-   updateNotification: (n: Notification) => void;
-  | }
-  | 
->  | const useAppStore = create<AppState>((set) => ({
-                                             ^
-   |   currentScreen: 'dashboard',
-  |   setCurrentScreen: (screen) => set({ currentScreen: screen }),
-  | 
-### 🔧 Tech Stack
-- Frontend: React (TypeScript) + CSS + Vite (Unless specified otherwise in history)
-- make sure to include all necessary files to be able to download and run this project like index.html or index.tsx etc
-- Backend: Something compatible with react
-- State Management: Zustand
-
-### 📂 Output Format (Strict markdown Format)
-Follow this exact format for parsing. For each step, generate ONLY the content for that step.
-Use markdown headers like:
-```
-#### frontend/src/App.tsx
-```typescript
-// code here
-```
-
-#### backend/src/server.ts
-```typescript
-// code here
-```
-> All frontend-related files (e.g., `vite.config.ts`, `tsconfig.json`, `tailwind.config.cjs`, `index.html`, `package.json`) must be under the `frontend/` folder.  
-> All backend files (e.g., `requirements.txt`, `main.py`, `pyproject.toml`) must be under the `backend/` folder.  
-> No files should exist at the project root except the `README.md`.
 ---
 
-1.  **Project Overview**: A high-level description based on the conversation.
-2.  **Folder Structure**: A markdown tree.
-3.  **Code Files**: All frontend and backend code. Use markdown headers for each file path (e.g., `#### path/to/file.ext`).
-4.  **README.md**: Complete setup and run instructions.
+🧾 **User Request**: "{user_input}"
+
+---
+
+### 🔧 Tech Stack
+- **Frontend**: React (TypeScript) + Tailwind CSS + Vite + React Router + Zustand
+- **Backend**: Python FastAPI + SQLAlchemy + PostgreSQL
+- **State Management**: Zustand
+- **Authentication**: JWT (JSON Web Tokens)
+
+---
+
+### 📋 Project Requirements
+- Write clean, modular, DRY code using best practices (e.g., SOLID)
+- Include detailed inline comments and logging where appropriate
+- Provide a complete and runnable folder/file structure
+- Ensure:
+  - All imports work (no missing files or broken paths)
+  - `package.json`, `vite.config.ts`, `index.html`, `.env`, etc. are included and complete
+  - `README.md` has full setup and usage instructions
+  - All paths and routing logic in React are correct and functional
+  - `index.html` has proper script tags
+
+---
+
+### 📂 Output Format (Strict Markdown Format)
+1. ✅ **Project Overview**
+2. 📁 **Folder Structure**
+3. 🔢 **Code Blocks**
+4. 🚀 **Setup Instructions**
+5. 📝 **Notes**
+
+Start building for: **"{user_input}"**
 """
 
-CODE_GEN_PLAN = {
-    "Project Overview": "First, provide the 'Project Overview'. Summarize the app's features based on the entire conversation history.",
-    "Folder Structure": "Next, generate the complete 'Folder Structure' in a markdown tree format.",
-    "Code Files": "Now, generate all the code files (Frontend and Backend). Ensure each file is in its own markdown block with a `#### path/to/file.ext` header as well as make sure to include all files like index etc so that no import fails as well as make sure of having all necessary libraries in the package.json for frontend.",
-    "README.md": "Finally, create the `README.md` file with complete setup instructions. and dont use #### the four # header inside the readme",
-    "Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
+SECTION_PROMPTS = {
+    "overview": "Start with Part 1 - ✅ Project Overview.",
+    "structure": "Generate Part 2 - 📁 Folder Structure in markdown tree format.",
+    "frontend": "Generate Part 3 - 🔢 Code for the React Frontend.",
+    "backend": "Generate Part 4 - 🔢 Code for the FastAPI Backend.",
+    "setup": "Generate Part 5 - 🚀 Setup Instructions.",
+    "notes": "Generate Part 6 - 📝 Notes."
 }
 
-# --- API Endpoints ---
+# -------------------------
+# Utilities
+# -------------------------
+def parse_markdown_to_dict(markdown: str):
+    file_pattern = r'####\s+(.+?)\s*\r?\n```[ \t]*([a-zA-Z0-9+\-_.]*)?\s*\r?\n([\s\S]*?)```'
+    files = {}
+    for match in re.finditer(file_pattern, markdown, re.DOTALL):
+        path = match.group(1).strip()
+        content = match.group(3).strip()
+        files[path] = content
+    return files
+
+def extract_project_summary(markdown: str):
+    summary_re = r'##\s*(?:🔹\s*)?Project Overview\s*\r?\n([\s\S]*?)(?=\r?\n---|\r?\n\*\*\*|^##\s|\Z)'
+    m = re.search(summary_re, markdown, re.DOTALL | re.MULTILINE)
+    return m.group(1).strip() if m else ""
+
+def extract_readme(markdown_output: str) -> str:
+    pattern = r'####\s+README\.md\s*\r?\n```[ \t]*(?:markdown|md)?[ \t]*\r?\n([\s\S]*?)```'
+    match = re.search(pattern, markdown_output, re.DOTALL | re.IGNORECASE)
+    return match.group(1).strip() if match else ""
+
+@retry(retry=retry_if_exception_type(OpenAIError),
+       stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10))
+def ask_openai(messages: List[Dict[str, str]]) -> str:
+    response = client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT_NAME,
+        messages=messages,
+        temperature=0.7,
+        max_tokens=1000,
+        top_p=1.0
+    )
+    return response.choices[0].message.content
+
+# -------------------------
+# Endpoints
+# -------------------------
 @app.get("/")
 async def root():
-    return {"message": "Conversational AI Coder is running!", "status": "healthy"}
+    return {"message": "StudAI Works is running", "status": "healthy"}
 
-@app.post("/start-conversation", response_model=StartResponse)
-async def start_conversation():
-    session_id = str(uuid.uuid4())
-    initial_message = "Hello! I'm here to help you plan your web application. What are you thinking of building today?"
-    CONVERSATION_SESSIONS[session_id] = [
-        {"role": "system", "content": REFINEMENT_SYSTEM_PROMPT},
-        {"role": "assistant", "content": initial_message}
+@app.post("/chat")
+async def chat_endpoint(request: ChatRequest):
+    session_id = request.sessionId or str(uuid.uuid4())
+    if session_id not in sessions:
+        sessions[session_id] = {"chat": []}
+    chat = sessions[session_id]["chat"]
+    chat.append({"role": "user", "content": request.message})
+    response = ask_openai([{"role": "system", "content": "You're a helpful assistant for planning software projects."}] + chat)
+    chat.append({"role": "assistant", "content": response})
+    return {"sessionId": session_id, "response": response}
+
+@app.post("/generate", response_model=GenerateResponse)
+async def generate_endpoint(request: GenerateRequest):
+    session_id = request.sessionId or str(uuid.uuid4())
+
+    # -------- Phase 2: Planning (Visibility added) --------
+    logger.info(f"{BLUE}PHASE 2 ▶ Starting planning for session {session_id}{RESET}")
+    logger.info(f"{BLUE}PHASE 2 ▶ UserInput:{RESET} {request.userInput}")
+
+    plan_prompt = [
+        {"role": "system", "content": "You are a senior software architect. Create a step-by-step plan."},
+        {"role": "user", "content": request.userInput}
     ]
-    logger.info(f"New conversation started: {session_id}")
-    return StartResponse(session_id=session_id, message=initial_message)
+    plan = ask_openai(plan_prompt)
+    logger.info(f"{BLUE}PHASE 2 ✅ Plan generated (preview):{RESET} {plan[:350].replace(chr(10),' ')}{'...' if len(plan) > 350 else ''}")
 
-@app.post("/refine", response_model=ConversationResponse)
-async def refine_features(request: ConversationRequest):
-    if request.session_id not in CONVERSATION_SESSIONS:
-        raise HTTPException(status_code=404, detail="Session not found.")
-    
-    history = CONVERSATION_SESSIONS[request.session_id]
-    history.append({"role": "user", "content": request.message})
+    tools_prompt = [
+        {"role": "system", "content": "Suggest the best stack, tools, and libraries."},
+        {"role": "user", "content": plan}
+    ]
+    tools = ask_openai(tools_prompt)
+    logger.info(f"{BLUE}PHASE 2 ✅ Tools suggested (preview):{RESET} {tools[:350].replace(chr(10),' ')}{'...' if len(tools) > 350 else ''}")
+    logger.info(f"{BLUE}PHASE 2 ⏹ Completed planning for session {session_id}{RESET}")
 
+    base_prompt = create_base_prompt(request.userInput) + f"""
+
+---\n
+### 🛠 Plan:\n{plan}\n
+---\n
+### 🧰 Tools:\n{tools}
+"""
+
+    sessions[session_id] = {
+        "chat": [{"role": "user", "content": request.userInput}],
+        "code": [{"role": "system", "content": "You are an expert developer."},
+                 {"role": "user", "content": base_prompt}]
+    }
+
+    full_response = ""
+    history = sessions[session_id]["code"]
+
+    # -------- Generation with Phase 3 self-review per section --------
+    for section, prompt in SECTION_PROMPTS.items():
+        logger.info(f"{YELLOW}SECTION ▶ Generating '{section}'...{RESET}")
+        history.append({"role": "user", "content": prompt})
+        section_response = ask_openai(history)
+        logger.info(f"{YELLOW}SECTION ✅ Draft generated for '{section}' (preview):{RESET} {section_response[:220].replace(chr(10),' ')}{'...' if len(section_response) > 220 else ''}")
+
+        # Phase 3: Self-review & correction (Visibility added)
+        logger.info(f"{GREEN}PHASE 3 ▶ Reviewing & correcting section '{section}'...{RESET}")
+        review_prompt = [
+            {"role": "system", "content": "Review the following code or content for bugs, missing parts, or bad practices. Then fix it without removing correct content."},
+            {"role": "user", "content": section_response}
+        ]
+        corrected_section = ask_openai(review_prompt)
+        logger.info(f"{GREEN}PHASE 3 ✅ Review completed for '{section}' (preview):{RESET} {corrected_section[:220].replace(chr(10),' ')}{'...' if len(corrected_section) > 220 else ''}")
+
+        section_response = corrected_section
+        history.append({"role": "assistant", "content": section_response})
+        throttle_tokens(len(section_response) // 4)
+        full_response += f"\n\n---\n### 🔹 {section.capitalize()}\n\n{section_response.strip()}"
+
+    logger.info(f"{MAGENTA}ALL SECTIONS ✅ Completed for session {session_id}{RESET}")
+
+    return GenerateResponse(
+        sessionId=session_id,
+        generatedPrompt=base_prompt,
+        generatedCode=full_response.strip()
+    )
+
+@app.post("/followup")
+async def followup_endpoint(request: FollowupRequest):
+    if request.sessionId not in sessions or "code" not in sessions[request.sessionId]:
+        raise HTTPException(status_code=404, detail="Session not found")
+    code_history = sessions[request.sessionId]["code"]
+    code_history.append({"role": "user", "content": request.followUp})
+    logger.info(f"{YELLOW}FOLLOW-UP ▶ Applying incremental change...{RESET}")
+    new_code = ask_openai(code_history)
+    review_prompt = [
+        {"role": "system", "content": "Review the code for bugs, missing parts, or bad practices and fix them."},
+        {"role": "user", "content": new_code}
+    ]
+    corrected_code = ask_openai(review_prompt)
+    code_history.append({"role": "assistant", "content": corrected_code})
+    logger.info(f"{GREEN}FOLLOW-UP ✅ Change reviewed & applied (preview):{RESET} {corrected_code[:220].replace(chr(10),' ')}{'...' if len(corrected_code) > 220 else ''}")
+    return {"update": corrected_code}
+
+@app.get("/health")
+@retry(retry=retry_if_exception_type(OpenAIError),
+       stop=stop_after_attempt(3),
+       wait=wait_random_exponential(multiplier=1, min=4, max=10))
+async def health_check():
     try:
-        response = await client.chat.completions.create(
+        response = client.chat.completions.create(
             model=AZURE_OPENAI_DEPLOYMENT_NAME,
-            messages=history,
-            temperature=0.7,
-            max_tokens=2000,
+            messages=[{"role": "user", "content": "Ping"}],
+            temperature=0.0,
+            max_tokens=10
         )
-        reply = response.choices[0].message.content
-        history.append({"role": "assistant", "content": reply})
-        CONVERSATION_SESSIONS[request.session_id] = history
-        return ConversationResponse(reply=reply, session_id=request.session_id)
+        return {"status": "healthy", "service": "Azure OpenAI connected"}
     except Exception as e:
-        logger.error(f"Error during refinement: {e}")
-        raise HTTPException(status_code=500, detail="AI conversation failed.")
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail="Azure OpenAI connection failed")
 
-@retry(
-    wait=wait_random_exponential(min=1, max=20),
-    stop=stop_after_attempt(3),
-    retry=retry_if_exception_type(RateLimitError)
-)
-# New function: Non-streamed generation
-async def run_code_generation(request: GenerateRequest) -> str:
+@app.post("/generate-simple")
+@retry(retry=retry_if_exception_type(OpenAIError),
+       stop=stop_after_attempt(3),
+       wait=wait_exponential(min=2, max=10))
+async def generate_simple(request: GenerateRequest):
+    simple_prompt = f"Create a simple web app for: {request.userInput}"
+    result = client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT_NAME,
+        messages=[{"role": "user", "content": simple_prompt}],
+        temperature=0.5,
+        max_tokens=2048
+    )
+    return {
+        "userInput": request.userInput,
+        "generatedCode": result.choices[0].message.content,
+        "prompt": simple_prompt
+    }
+
+# -------------------------
+# New Advanced Endpoints
+# -------------------------
+@app.post("/start", response_model=StartResponse)
+async def start():
+    session_id = str(uuid.uuid4())
+    CONVERSATION_SESSIONS[session_id] = [{
+        "role": "system",
+        "content": "You are a senior software engineer with deep expertise in code refinement and targeted file editing."
+    }]
+    return StartResponse(session_id=session_id, message="Session started.")
+
+@app.post("/conversation", response_model=ConversationResponse)
+async def conversation(request: ConversationRequest):
     if request.session_id not in CONVERSATION_SESSIONS:
-        raise HTTPException(status_code=404, detail="Session not found to generate code from.")
+        raise HTTPException(status_code=404, detail="Session not found")
+    conversation_history = CONVERSATION_SESSIONS[request.session_id]
+    conversation_history.append({"role": "user", "content": request.message})
+    reply = ask_openai(conversation_history)
+    conversation_history.append({"role": "assistant", "content": reply})
+    work_summary = None
+    if "generate" in request.message.lower() or "create" in request.message.lower():
+        work_summary = extract_project_summary(reply)
+    return ConversationResponse(reply=reply, session_id=request.session_id, work_summary=work_summary)
 
-    conversation_history = copy.deepcopy(CONVERSATION_SESSIONS[request.session_id])
+@app.post("/refine")
+async def refine_existing_code(session_id: str, refinement_instructions: str):
+    if session_id not in CONVERSATION_SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found")
+    history = copy.deepcopy(CONVERSATION_SESSIONS[session_id])
+    history.append({"role": "user", "content": f"Refine this project: {refinement_instructions}"})
+    logger.info(f"{YELLOW}REFINE ▶ Refining existing project for session {session_id}{RESET}")
+    refinement_reply = ask_openai(history)
+    files_dict = parse_markdown_to_dict(refinement_reply)
+    readme_content = extract_readme(refinement_reply)
+    logger.info(f"{GREEN}REFINE ✅ Done (files parsed):{RESET} {len(files_dict)}")
+    return {
+        "refined_files": files_dict,
+        "refined_readme": readme_content
+    }
 
-    messages = [
-        {"role": "system", "content": CODE_GEN_SYSTEM_PROMPT},
-        {"role": "user", "content": "Here is the full conversation history. Please generate the application based on this.\n\n" + "\n".join([f"{m['role']}: {m['content']}" for m in conversation_history if m['role'] != 'system'])}
+@app.post("/edit-file")
+async def targeted_file_edit(file_content: str, edit_instructions: str):
+    prompt = [
+        {"role": "system", "content": "Edit the provided file according to the given instructions, keeping the rest of the content unchanged."},
+        {"role": "user", "content": f"File content:\n{file_content}\n\nInstructions:\n{edit_instructions}"}
     ]
-
-    full_output = ""
-    try:
-        for section_title, section_task in CODE_GEN_PLAN.items():
-            messages.append({"role": "user", "content": section_task})
-
-            response = await client.chat.completions.create(
-                model=AZURE_OPENAI_DEPLOYMENT_NAME,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=10192,
-            )
-
-            section_response = response.choices[0].message.content
-            messages.append({"role": "assistant", "content": section_response})
-
-            full_output += f"\n\n---\n## 🔹 {section_title}\n\n{section_response}"
-
-    except Exception as e:
-        logger.error(f"Error during generation: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error during code generation: {str(e)}")
-
-    return full_output
-
-
-# Final API endpoint
-@app.post("/generate")
-async def generate_code(request: GenerateRequest):
-    try:
-        full_output = await run_code_generation(request)
-        return Response(content=full_output, media_type='text/markdown')
-    except Exception as e:
-        logger.error(f"Error during generation: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    logger.info(f"{YELLOW}EDIT-FILE ▶ Applying targeted edit...{RESET}")
+    edited_file = ask_openai(prompt)
+    logger.info(f"{GREEN}EDIT-FILE ✅ Edit completed (preview):{RESET} {edited_file[:220].replace(chr(10),' ')}{'...' if len(edited_file) > 220 else ''}")
+    return {"edited_file": edited_file}
