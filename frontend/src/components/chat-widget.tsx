@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { MessageCircle, X, Send, Bot, User, Minimize2 } from "lucide-react"
+import { historyService } from "@/services/historyService"
 
 interface ChatMessage {
   id: string
@@ -38,7 +39,7 @@ export function ChatWidget() {
     scrollToBottom()
   }, [messages])
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return
 
     const userMessage: ChatMessage = {
@@ -52,19 +53,58 @@ export function ChatWidget() {
     setInput("")
     setIsTyping(true)
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = generateBotResponse(input)
+    try {
+      // Store user message
+      await historyService.storeChatMessage(input, 'user');
+
+      // Get bot response
+      const botResponse = generateBotResponse(input);
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: "bot",
         content: botResponse,
         timestamp: new Date(),
       }
+
       setMessages((prev) => [...prev, botMessage])
-      setIsTyping(false)
-    }, 1500)
+
+      // Store bot message
+      await historyService.storeChatMessage(botResponse, 'assistant');
+
+      // If the response contains generated code or file, store it
+      if (botResponse.includes('```') || botResponse.includes('Generated file:')) {
+        const fileName = `generated_${Date.now()}.txt`;
+        await historyService.storeFile(botResponse, fileName, 'text/plain');
+      }
+    } catch (error) {
+      console.error('Failed to store chat message:', error);
+    } finally {
+      setIsTyping(false);
+    }
   }
+
+  // Load chat history when widget opens
+  useEffect(() => {
+    if (isOpen) {
+      const loadChatHistory = async () => {
+        try {
+          const history = await historyService.getChatHistory();
+          if (history.length > 0) {
+            const formattedMessages: ChatMessage[] = history.map(msg => ({
+              id: msg.id,
+              type: msg.role === 'user' ? 'user' : 'bot',
+              content: msg.message,
+              timestamp: new Date(msg.created_at)
+            }));
+            setMessages(formattedMessages);
+          }
+        } catch (error) {
+          console.error('Failed to load chat history:', error);
+        }
+      };
+      loadChatHistory();
+    }
+  }, [isOpen])
 
   const generateBotResponse = (userInput: string): string => {
     const lowerInput = userInput.toLowerCase()
@@ -149,11 +189,10 @@ export function ChatWidget() {
                 {messages.map((message) => (
                   <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
                     <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        message.type === "user"
+                      className={`max-w-[80%] rounded-lg p-3 ${message.type === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start space-x-2">
                         {message.type === "bot" && <Bot className="h-4 w-4 mt-0.5 flex-shrink-0" />}

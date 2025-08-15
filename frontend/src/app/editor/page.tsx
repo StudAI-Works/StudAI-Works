@@ -294,7 +294,7 @@ const headerUser = {
                     <div className="text-blue-400">
                       {isRunning ? (
                         <>
-                          <div>✓ Local: http://localhost:3000</div>
+                          <div>✓ Local: http://localhost:8080</div>
                           <div>✓ Ready in 1.2s</div>
                           <div className="text-green-400">Server running...</div>
                         </>

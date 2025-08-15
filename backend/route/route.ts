@@ -8,6 +8,13 @@ import { Project } from "../controllers/Project";
 import { updateProfile, updateAvatar, getProfile } from "../controllers/profileController";
 import Allusers from "../controllers/AllUsers";
 import { protect } from "../middleware/authMiddleware";
+import {
+  storeGeneratedFile,
+  storeChatMessage,
+  getFileHistory,
+  getChatHistory,
+  deleteGeneratedFile
+} from "../controllers/historyController";
 
 const router: Router = Router();
 
@@ -106,7 +113,14 @@ router.post("/api/generate", protect, async (req: Request, res: Response, next: 
   }
 });
 
+// History routes
+router.post("/history/file", storeGeneratedFile);
+router.post("/history/chat", storeChatMessage);
+router.post("/history/files", getFileHistory);
+router.post("/history/chats",  getChatHistory);
+router.post("/history/filed/:id", deleteGeneratedFile);
+
 // Legacy route
-router.post("/generate", protect, Project);
+router.post("/generate",  Project);
 
 export default router;

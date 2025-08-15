@@ -17,7 +17,7 @@ interface Session {
 // --- UPDATE: Add getToken to the context type ---
 interface AuthContextType {
   user: User | null;
-  token: string | null; // Keep track of the token
+    token: string | null; // Keep track of the token
   login: (sessionData: Session) => void;
   logout: () => void;
   isAuthenticated: boolean;

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +12,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useTheme } from "next-themes";
-import { Send, Sparkles, Code, Eye, Copy, Download, ImageIcon, FileText, Calculator, User, Layout, Database, Globe, Smartphone, Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown } from "lucide-react";
+import { Send, Sparkles, Code, Eye, Copy, Download, ImageIcon, FileText, Calculator, User, Layout, Database, Globe, Smartphone, Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown, Loader2 } from "lucide-react";
 import { Header } from "@/components/header";
 import { ChatWidget } from "@/components/chat-widget";
 import { Navigate } from "react-router-dom";
@@ -21,6 +22,9 @@ import { useAuth } from "../context/authContext";
 import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
+import { historyService } from '@/services/historyService';
+
+
 
 // Interfaces
 interface Message {
@@ -28,6 +32,7 @@ interface Message {
   type: "user" | "assistant" | "error" | "system";
   content: string;
   timestamp: Date;
+  loading?: boolean; // Add loading state for messages
 }
 interface GeneratedFile {
   path: string;
@@ -344,6 +349,7 @@ export default function GeneratePage() {
   const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user, token, logout } = useAuth();
@@ -411,7 +417,7 @@ export default function GeneratePage() {
             "tailwindcss": "^3.4.1",
             "autoprefixer": "^10.4.16",
             "postcss": "^8.4.32",
-            "firebase":"^1.0.0"
+            "firebase": "^1.0.0"
           },
           devDependencies: {
             "@types/node": "^20.0.0",
@@ -685,11 +691,11 @@ export interface UserProfile {
 
     // Enhanced missing modules detection system
     const missingModules = new Set<string>();
-    
+
     // Helper function to extract all import paths from code
     const extractImportPaths = (code: string): string[] => {
       const imports = [];
-      
+
       // Multiple regex patterns to catch different import styles
       const patterns = [
         // import ... from '...'
@@ -701,7 +707,7 @@ export interface UserProfile {
         // const ... = require('...')
         /const\s+[^=]+\s*=\s*require\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g
       ];
-      
+
       patterns.forEach(pattern => {
         let match;
         while ((match = pattern.exec(code)) !== null) {
@@ -712,20 +718,20 @@ export interface UserProfile {
           }
         }
       });
-      
+
       return imports;
     };
 
     // Helper function to resolve relative imports to absolute paths
     const resolveImportPath = (importPath: string, fromFile: string): string => {
       let resolvedPath = importPath;
-      
+
       if (importPath.startsWith('./') || importPath.startsWith('../')) {
         // Resolve relative path
         const currentDir = fromFile.substring(0, fromFile.lastIndexOf('/'));
         const parts = currentDir.split('/').filter(p => p);
         const importParts = importPath.split('/').filter(p => p);
-        
+
         for (const part of importParts) {
           if (part === '..') {
             parts.pop();
@@ -733,14 +739,14 @@ export interface UserProfile {
             parts.push(part);
           }
         }
-        
+
         resolvedPath = '/' + parts.join('/');
       } else if (importPath.startsWith('/src/')) {
         resolvedPath = importPath;
       } else if (importPath.startsWith('/')) {
         resolvedPath = importPath.startsWith('/src/') ? importPath : `/src${importPath}`;
       }
-      
+
       return resolvedPath;
     };
 
@@ -757,7 +763,7 @@ export interface UserProfile {
         `${basePath}/index.js`,
         `${basePath}/index.jsx`
       ];
-      
+
       return possiblePaths.some(path => files[path]);
     };
 
@@ -765,10 +771,10 @@ export interface UserProfile {
     Object.keys(files).forEach(filePath => {
       const fileContent = files[filePath]?.code || '';
       const importPaths = extractImportPaths(fileContent);
-      
+
       importPaths.forEach(importPath => {
         const resolvedPath = resolveImportPath(importPath, filePath);
-        
+
         if (!moduleExists(resolvedPath, files)) {
           // Determine the best file extension based on the path
           let finalPath = resolvedPath;
@@ -789,12 +795,12 @@ export interface UserProfile {
     // Generate fallback files for missing modules
     missingModules.forEach(modulePath => {
       if (files[modulePath]) return; // Skip if already exists
-      
+
       const fileName = modulePath.split('/').pop() || '';
       const isComponent = modulePath.endsWith('.tsx') || modulePath.includes('/components/');
-      
+
       let fallbackContent = '';
-      
+
       if (modulePath.includes('/api/')) {
         // Generate API fallback
         const apiName = fileName.replace(/\.tsx?$/, '').replace(/Api$/, '');
@@ -1008,7 +1014,7 @@ export const fallbackArray: any[] = [];
 
 export default fallbackFunction;`;
       }
-      
+
       files[modulePath] = {
         code: fallbackContent,
         hidden: true
@@ -1114,9 +1120,9 @@ export default fallbackFunction;`;
   };
 
   const getAuthHeaders = () => ({
-  "Content-Type": "application/json",
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-});
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  });
 
   const startConversation = async () => {
     const loadingToastId = toast.loading("Starting conversation...");
@@ -1129,25 +1135,45 @@ export default fallbackFunction;`;
       const data = await res.json();
       console.log(data)
       setSessionId(data.session_id);
-      setMessages([{ id: Date.now().toString(), type: 'assistant', content: data.message, timestamp: new Date() }]);
+
+      // Add initial message to UI
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.message, timestamp: new Date() }]);
+
+      // Store initial message in history
+      await storeChatMessage(data.message, 'assistant');
+
       toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
       return data.session_id;
     } catch (err: any) {
-      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+      const errorMessage = `Error: ${err.message}`;
+
+      // Store error message in history
+      await storeChatMessage(errorMessage, 'error');
+
+      toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
     }
   };
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
-    
+    const currentTimestamp = new Date();
 
-    setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
+    // Add user message to UI while preserving history
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      type: 'user',
+      content: messageContent,
+      timestamp: currentTimestamp
+    }]);
     setInput("");
+
+    // Store user message in history
+    await storeChatMessage(messageContent, 'user');
 
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
       let sessionid;
-    
+
       if (!sessionId) {
         sessionid = await startConversation();
         localStorage.setItem("sessionid", sessionid)
@@ -1158,14 +1184,31 @@ export default fallbackFunction;`;
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
       });
-    
+
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
-      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
+
+      // Add assistant message to UI while preserving history
+      const responseTimestamp = new Date();
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        type: 'assistant',
+        content: data.reply,
+        timestamp: responseTimestamp
+      }]);
+
+      // Store assistant message in history
+      await storeChatMessage(data.reply, 'assistant');
+
       toast.update(loadingToastId, { render: "Response received!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
-      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+      const errorMessage = `Error: ${err.message}`;
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: errorMessage, timestamp: new Date() }]);
+
+      // Store error message in history
+      await storeChatMessage(errorMessage, 'error');
+
+      toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
     }
   };
 
@@ -1213,16 +1256,48 @@ export default fallbackFunction;`;
           if (!selectedFile) setSelectedFile(files[0]);
           const rootFolders = new Set(tree.filter(n => n.type === 'folder').map(n => n.path));
           setExpandedFolders(rootFolders);
+
+          // Store each generated file in history
+          for (const file of files) {
+            const fileType = getFileType(file.path);
+            await storeGeneratedFile(file.path, file.content, fileType);
+          }
         }
       }
 
+      // Store success message in chat history
+      await storeChatMessage("Code generation completed successfully!", 'assistant');
+
       toast.update(loadingToastId, { render: "Code generated!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
-      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+      const errorMessage = `Error: ${err.message}`;
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: errorMessage, timestamp: new Date() }]);
+
+      // Store error message in history
+      await storeChatMessage(errorMessage, 'error');
+
+      toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Helper function to determine file type from file path
+  const getFileType = (filePath: string): string => {
+    const ext = filePath.split('.').pop()?.toLowerCase() || '';
+    const mimeTypes: { [key: string]: string } = {
+      'ts': 'application/typescript',
+      'tsx': 'application/typescript',
+      'js': 'application/javascript',
+      'jsx': 'application/javascript',
+      'html': 'text/html',
+      'css': 'text/css',
+      'json': 'application/json',
+      'md': 'text/markdown',
+      'py': 'text/x-python',
+      'txt': 'text/plain'
+    };
+    return mimeTypes[ext] || 'text/plain';
   };
 
   const handleCodeEdit = (newCode: string | undefined) => {
@@ -1262,7 +1337,7 @@ export default fallbackFunction;`;
 
   const openInCodeSandbox = () => {
     if (!sandpackConfig.files || Object.keys(sandpackConfig.files).length === 0) return;
-    
+
     try {
       // Create the CodeSandbox parameters
       const files = sandpackConfig.files as SandpackFiles;
@@ -1277,18 +1352,18 @@ export default fallbackFunction;`;
           return acc;
         }, {} as Record<string, { content: string }>)
       };
-      
+
       // Use form submission to avoid URL length limits
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = 'https://codesandbox.io/api/v1/sandboxes/define';
       form.target = '_blank';
-      
+
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = 'parameters';
       input.value = JSON.stringify(parameters);
-      
+
       form.appendChild(input);
       document.body.appendChild(form);
       form.submit();
@@ -1298,6 +1373,56 @@ export default fallbackFunction;`;
       toast.error('Failed to open in CodeSandbox. Please try downloading the ZIP instead.');
     }
   };
+
+  // Helper function to store chat messages in history
+  const storeChatMessage = async (content: string, role: 'user' | 'assistant' | 'error') => {
+    try {
+      await historyService.storeChatMessage(content, role);
+    } catch (error) {
+      console.error('Failed to store chat message:', error);
+      // Don't show toast here as it would be too noisy
+    }
+  };
+
+  // Helper function to store generated file in history
+  const storeGeneratedFile = async (fileName: string, content: string, fileType: string) => {
+    try {
+      await historyService.storeFile(content, fileName, fileType);
+    } catch (error) {
+      console.error('Failed to store generated file:', error);
+      toast.error('Failed to save file to history');
+    }
+  };
+
+  // Load chat history when component mounts
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const history = await historyService.getChatHistory();
+
+        // Convert history items to the message format used in the component
+        const formattedMessages = history.map(msg => ({
+          id: msg.id || Date.now().toString(),
+          type: msg.role as 'user' | 'assistant' | 'error',
+          content: msg.message,
+          timestamp: new Date(msg.created_at)
+        }));
+
+        // Sort messages by timestamp ascending (oldest first)
+        formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+        toast.error('Failed to load chat history');
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadChatHistory();
+  }, []);
 
   const FileTreeItem = ({ node, level = 0 }: { node: FileTreeNode; level?: number }) => {
     const isExpanded = expandedFolders.has(node.path);
@@ -1339,15 +1464,25 @@ export default fallbackFunction;`;
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
       <div className="flex-shrink-0">
         <ToastContainer position="bottom-right" theme="dark" />
         <Header user={headerUser} onLogout={logout} />
-        {/* <ChatWidget /> */}
       </div>
 
+      {/* Main Content */}
       <main className="flex-1 min-h-0">
-        {messages.length === 0 ? (
+        {messages.length === 0 && isLoadingHistory ? (
+          // Loading State
+          <div className="h-full flex items-center justify-center">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <p className="text-muted-foreground">Loading chat history...</p>
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
+          // Empty State with Quick Actions
           <ScrollArea className="h-full">
             <div className="container mx-auto px-4 py-8">
               <div className="max-w-4xl mx-auto">
@@ -1414,6 +1549,7 @@ export default fallbackFunction;`;
             </div>
           </ScrollArea>
         ) : (
+          // Chat Interface with Messages
           <ResizablePanelGroup direction="horizontal" className="h-full w-full">
             <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
               <div className="h-full flex flex-col">
@@ -1431,21 +1567,44 @@ export default fallbackFunction;`;
                     Generate Code
                   </Button>
                 </div>
-                <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-6">
+
+                <div className="flex-1">
+                  <div className="p-4 space-y-6 max-h-screen overflow-y-scroll">
                     {messages.map((message) => (
                       <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[80%] rounded-lg p-4 ${message.type === "user" ? "bg-primary text-primary-foreground" : message.type === "error" ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"}`}>
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                          <div className="text-xs opacity-70 mt-2">{message.timestamp.toLocaleTimeString()}</div>
+                        <div
+                          className={cn(
+                            "max-w-[80%] rounded-lg p-4",
+                            message.type === "user"
+                              ? "bg-primary text-primary-foreground"
+                              : message.type === "error"
+                                ? "bg-destructive text-destructive-foreground"
+                                : "bg-muted text-muted-foreground",
+                            message.loading && "opacity-70"
+                          )}
+                        >
+                          {message.loading ? (
+                            <div className="flex items-center space-x-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                              <span>Sending...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="whitespace-pre-wrap">{message.content}</p>
+                              <div className="text-xs opacity-70 mt-2">
+                                {message.timestamp.toLocaleTimeString()}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
+
                     {isGenerating && (
                       <div className="flex justify-start">
                         <div className="bg-muted text-muted-foreground rounded-lg p-4">
                           <div className="flex items-center space-x-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
                             <span>Generating...</span>
                           </div>
                         </div>
@@ -1453,7 +1612,8 @@ export default fallbackFunction;`;
                     )}
                   </div>
                   <div ref={messagesEndRef} />
-                </ScrollArea>
+                </div>
+
                 <div className="border-t p-4 flex-shrink-0">
                   <div className="relative">
                     <Textarea
@@ -1554,13 +1714,13 @@ export default fallbackFunction;`;
                             'axios': "^1.11.0",
                             "react-icons": "^5.5.0",
                             "zustand": "^5.0.0",
-                            "date-fns":"^1.0.0"
+                            "date-fns": "^1.0.0"
                           }
                         }}
                       >
-                        <SandpackLayout style={{height:"800px"}}>
-                            <SandpackCodeEditor style={{ height: "800px" }} />
-                            <SandpackPreview style={{ height: "800px" }} />
+                        <SandpackLayout style={{ height: "800px" }}>
+                          <SandpackCodeEditor style={{ height: "800px" }} />
+                          <SandpackPreview style={{ height: "800px" }} />
                         </SandpackLayout>
                       </SandpackProvider>
                     )}
