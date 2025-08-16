@@ -11,7 +11,10 @@ from dotenv import load_dotenv
 import openai
 import re
 from openai import AsyncAzureOpenAI, RateLimitError
+from supabase._async.client import AsyncClient, create_client
 from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
+from datetime import datetime
+from fastapi import Depends
 
 # --- Setup & Configuration ---
 load_dotenv()
@@ -53,6 +56,29 @@ AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")  # e.g. "gpt-4-1"
 if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_KEY or not AZURE_OPENAI_DEPLOYMENT:
     raise RuntimeError("Azure OpenAI environment variables not set.")
+
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+async def get_supabase():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase URL or key not set in environment variables.")
+    return await create_client(SUPABASE_URL, SUPABASE_KEY)
+
+async def save_llm_output(session_id: str, llm_output: dict, supabase: AsyncClient):
+    response = await supabase.table("LLM").insert({
+        "id": session_id,
+        "session_id": session_id,
+        "llm_output": llm_output,
+        "created_at": datetime.utcnow().isoformat()
+    }).execute()
+    return response
+
+async def get_llm_outputs(session_id: str, supabase: AsyncClient):
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Session ID is required.")
+    response = await supabase.table("LLM").select("*").eq("id", session_id).execute()
+    return response.data
+
 
 openai.api_type = "azure"
 openai.api_base = AZURE_OPENAI_ENDPOINT
@@ -271,33 +297,60 @@ async def run_code_generation(request: GenerateRequest) -> str:
     return full_output
 
 @app.post("/generate")
-async def generate_code(request: GenerateRequest):
+async def generate_code(
+    request: GenerateRequest,
+    supabase: AsyncClient = Depends(get_supabase)
+):
     try:
-        full_output = await run_code_generation(request) # Log first 500 chars for debugging
+        full_output = await run_code_generation(request)
         files_dict = parse_markdown_to_dict(full_output)
         readme_content = extract_readme(full_output)
-        old_session = CONVERSATION_SESSIONS.get(request.session_id)
-        if isinstance(old_session, dict):
-            session = old_session
-        else:
-            session = {}
-        session["files"] = files_dict
-        session["readme"] = readme_content
-        session["full_markdown"] = full_output
-        CONVERSATION_SESSIONS[request.session_id] = session
+        # Save outputs in session as before...
+
+        # Save the generated code to Supabase
+        await save_llm_output(
+            session_id=request.session_id,
+            llm_output={"full_markdown": full_output, "files": files_dict, "readme": readme_content},
+            supabase=supabase
+        )
+
         return Response(content=full_output, media_type='text/markdown')
     except Exception as e:
         logger.error(f"Error during generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/db-health")
+async def db_health(supabase: AsyncClient = Depends(get_supabase)):
+    try:
+        result = await supabase.table("LLM").select("*").limit(1).execute()
+        return {"status": "connected", "rows_returned": len(result.data)}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
 @app.post("/parse-text", response_model=ConversationResponse)
-async def parse_text(request: ConversationRequest):
-    session_data = CONVERSATION_SESSIONS.get(request.session_id)
+async def parse_text(request: ConversationRequest, supabase: AsyncClient = Depends(get_supabase)):
+    print(f"Received request to parse text: {request.message} for session {request.session_id}")
+    db_response = await get_llm_outputs(request.session_id, supabase)
+
+    if not db_response:
+        raise HTTPException(status_code=404, detail="No LLM outputs found for this session.")
+    session_data = db_response[0].get("llm_output", {})
     if not session_data or "files" not in session_data or "readme" not in session_data:
         raise HTTPException(status_code=404, detail="Session or project not found.")
+    llm_record = db_response[0]
 
-    readme_content = session_data["readme"]
-    all_files = session_data["files"]
-
+    # Extract stored JSON output
+    stored_llm_output = llm_record["llm_output"]
+    print(f"Stored LLM output: {stored_llm_output}")
+    readme_content = stored_llm_output.get("files").get("README.md", "") 
+    if not readme_content:
+        readme_content = stored_llm_output.get("files").get("readme", "")
+    all_files = stored_llm_output.get("files")
+    print(f"Stored README content: {readme_content}")
+    print(f"Stored files: {all_files}")
+    if not readme_content or not all_files:
+        raise HTTPException(status_code=404, detail="Incomplete project data in database.")
     # Step 1: Ask AI which files to modify
     file_list_prompt = f"""
 Project README.md:
@@ -384,11 +437,19 @@ This formatting is mandatory so the file is machine‑parsed.
     
     if work_summary:
         work_summary = work_summary.removeprefix("plaintext").lstrip()
-    # Step 4: Update session with new file contents
+
     for fpath, content in updated_files.items():
         all_files[fpath] = content
-    session_data["files"] = all_files
-    CONVERSATION_SESSIONS[request.session_id] = session_data
+
+    # Prepare updated llm_output dict
+    updated_llm_output = {
+        **stored_llm_output,
+        "files": all_files,
+    }
+
+    # Update the record in Supabase by id
+    await supabase.table("LLM").update({"llm_output": updated_llm_output}).eq("id", request.session_id).execute()
+
 
     return ConversationResponse(reply=edit_resp, session_id=request.session_id, work_summary=work_summary)
 
