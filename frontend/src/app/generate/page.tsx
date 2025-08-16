@@ -11,10 +11,9 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useTheme } from "next-themes";
-import { Send, Sparkles, Code, Eye, Copy, Download, ImageIcon, FileText, Calculator, User, Layout, Database, Globe, Smartphone, Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown } from "lucide-react";
+import { Send, Sparkles, Code, Eye, Copy, Download, ImageIcon, FileText, Calculator, User, Layout, Database, Globe, Smartphone, Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown, Wand2, Bug } from "lucide-react";
 import { Header } from "@/components/header";
-import { ChatWidget } from "@/components/chat-widget";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
@@ -100,239 +99,6 @@ const indexHtml = `<!DOCTYPE html>
 // const root = createRoot(container);
 // root.render(<React.StrictMode><App /></React.StrictMode>);`;
 
-const defaultStylesCss = `
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Base styles */
-body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: #ffffff;
-  color: #1f2937;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-/* Ensure the app takes full height */
-html, body, #root {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Container utilities */
-.container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-/* Button component styles */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s ease-in-out;
-  text-decoration: none;
-}
-
-.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-  border-color: #3b82f6;
-}
-
-.btn-primary:hover {
-  background-color: #2563eb;
-  border-color: #2563eb;
-}
-
-.btn-secondary {
-  background-color: white;
-  color: #374151;
-  border-color: #d1d5db;
-}
-
-.btn-secondary:hover {
-  background-color: #f9fafb;
-  border-color: #9ca3af;
-}
-
-/* Card component styles */
-.card {
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  border: 1px solid #e5e7eb;
-  overflow: hidden;
-}
-
-.card-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.card-body {
-  padding: 1.5rem;
-}
-
-.card-footer {
-  padding: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-  background-color: #f9fafb;
-}
-
-/* Form component styles */
-.form-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
-}
-
-.form-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-  margin-bottom: 0.5rem;
-}
-
-/* Navigation styles */
-.nav {
-  display: flex;
-  background-color: white;
-  border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-}
-
-.nav-item {
-  padding: 1rem 1.5rem;
-  color: #6b7280;
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s ease-in-out;
-}
-
-.nav-item:hover, .nav-item.active {
-  color: #3b82f6;
-  border-bottom-color: #3b82f6;
-}
-
-/* Utility classes */
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
-.gap-4 { gap: 1rem; }
-.gap-2 { gap: 0.5rem; }
-.p-4 { padding: 1rem; }
-.p-6 { padding: 1.5rem; }
-.px-4 { padding-left: 1rem; padding-right: 1rem; }
-.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mt-4 { margin-top: 1rem; }
-.text-center { text-align: center; }
-.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-.text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-.text-2xl { font-size: 1.5rem; line-height: 2rem; }
-.text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
-.font-bold { font-weight: 700; }
-.font-semibold { font-weight: 600; }
-.text-gray-600 { color: #6b7280; }
-.text-gray-800 { color: #1f2937; }
-.bg-gray-50 { background-color: #f9fafb; }
-.bg-gray-100 { background-color: #f3f4f6; }
-.border { border-width: 1px; }
-.border-gray-200 { border-color: #e5e7eb; }
-.rounded { border-radius: 0.25rem; }
-.rounded-lg { border-radius: 0.5rem; }
-.shadow { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); }
-.shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
-.min-h-screen { min-height: 100vh; }
-.w-full { width: 100%; }
-.max-w-md { max-width: 28rem; }
-.max-w-lg { max-width: 32rem; }
-.max-w-xl { max-width: 36rem; }
-.max-w-2xl { max-width: 42rem; }
-.max-w-4xl { max-width: 56rem; }
-.mx-auto { margin-left: auto; margin-right: auto; }
-
-/* Responsive grid */
-.grid { display: grid; }
-.grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-
-@media (min-width: 768px) {
-  .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .md\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .md\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
-@media (min-width: 1024px) {
-  .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .lg\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
-/* Ensure images are responsive */
-img {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Link styles */
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-/* Focus styles for accessibility */
-button:focus,
-input:focus,
-textarea:focus,
-select:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-`;
 
 export default function GeneratePage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -344,12 +110,18 @@ export default function GeneratePage() {
   const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [fullMarkdown, setFullMarkdown] = useState<string>("");
+  // Track saved project id to create new versions on subsequent saves
+  const [projectId, setProjectId] = useState<string | null>(null);
+  // Edit prompt
+  const [editText, setEditText] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
 
-  const BASE_URL = "http://localhost:8080";
+  // Allow overriding backend URL via Vite env, fallback to localhost
+  const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
 
   const sandpackConfig = useMemo(() => {
     if (generatedFiles.length === 0) {
@@ -379,8 +151,7 @@ export default function GeneratePage() {
       mainFileImportPath = mainFileImportPath.slice('src/'.length);
     }
 
-    // Remove file extension and add './' prefix for relative import
-    const importPath = `./${mainFileImportPath.replace(/\.(tsx|ts|js|jsx)$/, '')}`;
+  // Remove file extension
 
     const files: SandpackFiles = {
       '/public/index.html': { code: indexHtml, hidden: true },
@@ -411,7 +182,7 @@ export default function GeneratePage() {
             "tailwindcss": "^3.4.1",
             "autoprefixer": "^10.4.16",
             "postcss": "^8.4.32",
-            "firebase":"^1.0.0"
+            "firebase": "^1.0.0"
           },
           devDependencies: {
             "@types/node": "^20.0.0",
@@ -685,11 +456,11 @@ export interface UserProfile {
 
     // Enhanced missing modules detection system
     const missingModules = new Set<string>();
-    
+
     // Helper function to extract all import paths from code
     const extractImportPaths = (code: string): string[] => {
-      const imports = [];
-      
+      const imports: string[] = [];
+
       // Multiple regex patterns to catch different import styles
       const patterns = [
         // import ... from '...'
@@ -701,7 +472,7 @@ export interface UserProfile {
         // const ... = require('...')
         /const\s+[^=]+\s*=\s*require\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g
       ];
-      
+
       patterns.forEach(pattern => {
         let match;
         while ((match = pattern.exec(code)) !== null) {
@@ -712,20 +483,20 @@ export interface UserProfile {
           }
         }
       });
-      
+
       return imports;
     };
 
     // Helper function to resolve relative imports to absolute paths
     const resolveImportPath = (importPath: string, fromFile: string): string => {
       let resolvedPath = importPath;
-      
+
       if (importPath.startsWith('./') || importPath.startsWith('../')) {
         // Resolve relative path
         const currentDir = fromFile.substring(0, fromFile.lastIndexOf('/'));
         const parts = currentDir.split('/').filter(p => p);
         const importParts = importPath.split('/').filter(p => p);
-        
+
         for (const part of importParts) {
           if (part === '..') {
             parts.pop();
@@ -733,14 +504,14 @@ export interface UserProfile {
             parts.push(part);
           }
         }
-        
+
         resolvedPath = '/' + parts.join('/');
       } else if (importPath.startsWith('/src/')) {
         resolvedPath = importPath;
       } else if (importPath.startsWith('/')) {
         resolvedPath = importPath.startsWith('/src/') ? importPath : `/src${importPath}`;
       }
-      
+
       return resolvedPath;
     };
 
@@ -757,18 +528,19 @@ export interface UserProfile {
         `${basePath}/index.js`,
         `${basePath}/index.jsx`
       ];
-      
+
       return possiblePaths.some(path => files[path]);
     };
 
     // Scan all files for missing imports
     Object.keys(files).forEach(filePath => {
-      const fileContent = files[filePath]?.code || '';
+      const fileObj = files[filePath];
+      const fileContent = typeof fileObj === 'object' && fileObj !== null && 'code' in fileObj ? fileObj.code : '';
       const importPaths = extractImportPaths(fileContent);
-      
+
       importPaths.forEach(importPath => {
         const resolvedPath = resolveImportPath(importPath, filePath);
-        
+
         if (!moduleExists(resolvedPath, files)) {
           // Determine the best file extension based on the path
           let finalPath = resolvedPath;
@@ -789,12 +561,12 @@ export interface UserProfile {
     // Generate fallback files for missing modules
     missingModules.forEach(modulePath => {
       if (files[modulePath]) return; // Skip if already exists
-      
+
       const fileName = modulePath.split('/').pop() || '';
       const isComponent = modulePath.endsWith('.tsx') || modulePath.includes('/components/');
-      
+
       let fallbackContent = '';
-      
+
       if (modulePath.includes('/api/')) {
         // Generate API fallback
         const apiName = fileName.replace(/\.tsx?$/, '').replace(/Api$/, '');
@@ -1008,7 +780,7 @@ export const fallbackArray: any[] = [];
 
 export default fallbackFunction;`;
       }
-      
+
       files[modulePath] = {
         code: fallbackContent,
         hidden: true
@@ -1040,6 +812,64 @@ export default fallbackFunction;`;
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+  // Load project if provided via query string (?project=<id>)
+  const location = useLocation();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const pid = params.get('project');
+    if (!pid) return;
+    (async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/projects/${pid}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const artifacts = (data.artifacts || []) as Array<{ path: string; content: string }>;
+        if (artifacts.length > 0) {
+          const files = artifacts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
+          setGeneratedFiles(files);
+          const tree = buildFileTree(files);
+          setFileTree(tree);
+          setSelectedFile(files[0]);
+          setExpandedFolders(new Set(tree.filter(n => n.type === 'folder').map(n => n.path)));
+          setProjectId(data.project?.id || pid);
+          // Rebuild a markdown preview to enable Save button and parity with streamed format
+          setFullMarkdown(filesToMarkdown(files));
+        } else {
+          // Still set project id so saving creates version 1
+          setProjectId(data.project?.id || pid);
+        }
+      } catch (e) {
+        console.error('Failed to load project', e);
+      }
+    })();
+  }, [location.search, token]);
+
+  const filesToMarkdown = (files: GeneratedFile[]): string => {
+    const parts: string[] = [];
+    parts.push(`## 🔹 Code Files`);
+    for (const f of files) {
+      const lang = f.path.endsWith('.ts') || f.path.endsWith('.tsx') ? 'ts' : f.path.endsWith('.js') || f.path.endsWith('.jsx') ? 'js' : f.path.endsWith('.css') ? 'css' : f.path.endsWith('.json') ? 'json' : '';
+      parts.push(`\n#### ${f.path}\n\n\
+\`\`\`${lang}\n${f.content}\n\
+\`\`\``);
+    }
+    return parts.join('\n\n---\n\n');
+  };
+
+
+  // Load the last project id for this user so we keep versioning
+  useEffect(() => {
+    if (user?.id) {
+      const key = `StudAI:lastProjectId:${user.id}`;
+      const last = localStorage.getItem(key);
+      if (last) setProjectId(last);
+    }
+  }, [user?.id]);
 
   const fixPath = (path: string): string => {
     // Fix common frontend root-level files
@@ -1114,9 +944,9 @@ export default fallbackFunction;`;
   };
 
   const getAuthHeaders = () => ({
-  "Content-Type": "application/json",
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-});
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  });
 
   const startConversation = async () => {
     const loadingToastId = toast.loading("Starting conversation...");
@@ -1139,7 +969,7 @@ export default fallbackFunction;`;
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
-    
+
 
     setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
     setInput("");
@@ -1147,7 +977,7 @@ export default fallbackFunction;`;
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
       let sessionid;
-    
+
       if (!sessionId) {
         sessionid = await startConversation();
         localStorage.setItem("sessionid", sessionid)
@@ -1158,7 +988,7 @@ export default fallbackFunction;`;
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
       });
-    
+
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
@@ -1184,7 +1014,7 @@ export default fallbackFunction;`;
     const loadingToastId = toast.loading("Generating code...");
 
     try {
-      const response = await fetch(`http://localhost:8000/generate`, {
+      const response = await fetch(`${BASE_URL}/api/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: sessionid }),
@@ -1215,13 +1045,120 @@ export default fallbackFunction;`;
           setExpandedFolders(rootFolders);
         }
       }
-
+      setFullMarkdown(responseText);
       toast.update(loadingToastId, { render: "Code generated!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
       toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleSaveProject = async () => {
+    if (!fullMarkdown) {
+      toast.error("Nothing to save yet");
+      return;
+    }
+    const loadingToastId = toast.loading("Saving project...");
+    try {
+      // Derive a simple title from the first heading or fallback
+      const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
+      // Use existing project id if present, otherwise create new
+      const targetId = projectId || 'new';
+      const res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+      });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      if (data.project_id) {
+        setProjectId(data.project_id);
+        if (user?.id) {
+          localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
+        }
+      }
+      toast.update(loadingToastId, { render: `Saved! Project ${data.project_id}, v${data.version}`, type: "success", isLoading: false, autoClose: 3000 });
+    } catch (err: any) {
+      toast.update(loadingToastId, { render: `Save failed: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+    }
+  };
+
+  const handleApplyEdit = async () => {
+    if (!projectId) {
+      toast.error("Save the project first to enable edits");
+      return;
+    }
+    if (!token) {
+      toast.error("Please sign in");
+      return;
+    }
+    if (!editText.trim()) {
+      toast.error("Enter what you want to change");
+      return;
+    }
+    const tId = toast.loading("Applying edit...");
+    try {
+      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ instructions: editText })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
+      if (arts.length > 0) {
+        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
+        setGeneratedFiles(files);
+        setFileTree(buildFileTree(files));
+        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
+        setFullMarkdown(filesToMarkdown(files));
+      }
+      toast.update(tId, { render: `Edit applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
+    } catch (e: any) {
+      toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
+    }
+  };
+
+  const handleFixError = async () => {
+    if (!projectId) {
+      toast.error("Save the project first to enable fixes");
+      return;
+    }
+    if (!token) {
+      toast.error("Please sign in");
+      return;
+    }
+    // Try latest error from chat messages; fallback to prompt()
+    const lastErrMsg = [...messages].reverse().find(m => m.type === 'error')?.content;
+    let errorText = lastErrMsg || '';
+    if (!errorText) {
+      // eslint-disable-next-line no-alert
+      const manual = window.prompt('Paste the error message to fix:');
+      if (!manual) return;
+      errorText = manual;
+    }
+    const tId = toast.loading("Fixing error...");
+    try {
+      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ error: errorText })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
+      if (arts.length > 0) {
+        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
+        setGeneratedFiles(files);
+        setFileTree(buildFileTree(files));
+        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
+        setFullMarkdown(filesToMarkdown(files));
+      }
+      toast.update(tId, { render: `Fix applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
+    } catch (e: any) {
+      toast.update(tId, { render: `Fix failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
     }
   };
 
@@ -1262,7 +1199,7 @@ export default fallbackFunction;`;
 
   const openInCodeSandbox = () => {
     if (!sandpackConfig.files || Object.keys(sandpackConfig.files).length === 0) return;
-    
+
     try {
       // Create the CodeSandbox parameters
       const files = sandpackConfig.files as SandpackFiles;
@@ -1277,18 +1214,18 @@ export default fallbackFunction;`;
           return acc;
         }, {} as Record<string, { content: string }>)
       };
-      
+
       // Use form submission to avoid URL length limits
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = 'https://codesandbox.io/api/v1/sandboxes/define';
       form.target = '_blank';
-      
+
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = 'parameters';
       input.value = JSON.stringify(parameters);
-      
+
       form.appendChild(input);
       document.body.appendChild(form);
       form.submit();
@@ -1347,7 +1284,7 @@ export default fallbackFunction;`;
       </div>
 
       <main className="flex-1 min-h-0">
-        {messages.length === 0 ? (
+        {messages.length === 0 && generatedFiles.length === 0 ? (
           <ScrollArea className="h-full">
             <div className="container mx-auto px-4 py-8">
               <div className="max-w-4xl mx-auto">
@@ -1430,6 +1367,31 @@ export default fallbackFunction;`;
                   >
                     Generate Code
                   </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="mt-2 ml-2"
+                    onClick={handleSaveProject}
+                    disabled={!fullMarkdown}
+                  >
+                    Save Project
+                  </Button>
+                  <div className="mt-3 space-y-2">
+                    <Textarea
+                      placeholder="Describe an edit (e.g., make shadows darker and background midnight blue)"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="min-h-[64px]"
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="secondary" size="sm" onClick={handleApplyEdit} disabled={!projectId}>
+                        <Wand2 className="h-4 w-4 mr-1" /> Apply Edit
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleFixError} disabled={!projectId}>
+                        <Bug className="h-4 w-4 mr-1" /> Fix Error
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 <ScrollArea className="flex-1">
                   <div className="p-4 space-y-6">
@@ -1507,11 +1469,11 @@ export default fallbackFunction;`;
                   </div>
 
                   <TabsContent value="code" className="flex-1 flex flex-col min-h-0">
-                    <ResizablePanelGroup direction="horizontal" className="flex-1">
+                    <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                       <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
-                        <div className="h-full border-r bg-muted/20 flex flex-col">
+                        <div className="h-full border-r bg-muted/20 flex flex-col min-h-0">
                           <div className="p-2 border-b flex-shrink-0"><h3 className="font-semibold text-sm">File Explorer</h3></div>
-                          <ScrollArea className="flex-1 p-2">
+                          <ScrollArea className="flex-1 p-2 min-h-0">
                             {fileTree.length > 0 ? (
                               <div className="space-y-1">{fileTree.map((node) => (<FileTreeItem key={node.path} node={node} />))}</div>
                             ) : (
@@ -1523,9 +1485,9 @@ export default fallbackFunction;`;
                           </ScrollArea>
                         </div>
                       </ResizablePanel>
-                      <ResizableHandle />
+                      <ResizableHandle withHandle />
                       <ResizablePanel defaultSize={75}>
-                        <div className="h-full">
+                        <div className="h-full min-h-0">
                           <Editor
                             height="100%"
                             language={selectedFile ? getLanguage(selectedFile.path) : 'plaintext'}
@@ -1539,7 +1501,7 @@ export default fallbackFunction;`;
                     </ResizablePanelGroup>
                   </TabsContent>
 
-                  <TabsContent value="preview" className="flex-1 p-0 m-0">
+                  <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
                     {selectedTab === 'preview' && (
                       <SandpackProvider
                         files={sandpackConfig.files}
@@ -1554,13 +1516,13 @@ export default fallbackFunction;`;
                             'axios': "^1.11.0",
                             "react-icons": "^5.5.0",
                             "zustand": "^5.0.0",
-                            "date-fns":"^1.0.0"
+                            "date-fns": "^1.0.0"
                           }
                         }}
                       >
-                        <SandpackLayout style={{height:"800px"}}>
-                            <SandpackCodeEditor style={{ height: "800px" }} />
-                            <SandpackPreview style={{ height: "800px" }} />
+                        <SandpackLayout style={{ height: "100%", minHeight: 0 }} className="flex-1 min-h-0">
+                          <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} />
+                          <SandpackPreview style={{ height: "calc(100vh - 240px)" }} />
                         </SandpackLayout>
                       </SandpackProvider>
                     )}

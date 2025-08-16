@@ -1,4 +1,4 @@
-# file: src/fastapi/main.py
+# file: Ai/main.py
 import os
 import copy
 import asyncio
@@ -17,27 +17,62 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Azure envs (do not fail-fast; allow non-Azure endpoints like /start-conversation)
+REQUIRED_ENV = [
+    "AZURE_OPENAI_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_API_VERSION",
+    "AZURE_OPENAI_DEPLOYMENT_NAME",
+]
+_missing = [k for k in REQUIRED_ENV if not os.getenv(k)]
+AZURE_READY = len(_missing) == 0
+
 app = FastAPI(
     title="StudAI Works - Conversational AI Coder",
     description="A conversational service to first refine features and then generate code.",
     version="5.0.0"
 )
 
+# CORS configuration via env
+# ALLOWED_ORIGINS: comma-separated list of origins. Example: http://localhost:5173,https://studai.app
+# CORS_ALLOW_CREDENTIALS: "true" | "false"
+_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins = [o.strip() for o in _origins_env.split(",") if o.strip()] or ["*"]
+allow_credentials = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+
+# If wildcard origins are used, browsers won't allow credentials; enforce safe behavior
+if "*" in allowed_origins and allow_credentials:
+    logger.warning(
+        "CORS_ALLOW_CREDENTIALS=true is incompatible with ALLOWED_ORIGINS='*'. "
+        "Disabling credentials to avoid browser rejection."
+    )
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # --- AI Client Setup ---
-client = AsyncAzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_KEY"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-)
+client = None
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+if AZURE_READY:
+    client = AsyncAzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_KEY"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+    )
+    logger.info(
+        "AI service initialized: model=%s, origins=%s, credentials=%s",
+        AZURE_OPENAI_DEPLOYMENT_NAME,
+        allowed_origins,
+        allow_credentials,
+    )
+else:
+    logger.warning("Azure OpenAI env not fully configured (%s missing). /start-conversation will work; /refine and /generate will return 503 until configured.", ", ".join(_missing))
 
 # --- In-Memory Session Storage ---
 CONVERSATION_SESSIONS = {}
@@ -60,6 +95,16 @@ class GenerateRequest(BaseModel):
 class StartResponse(BaseModel):
     session_id: str
     message: str
+
+class FileInput(BaseModel):
+    path: str
+    content: str
+
+class EditRequest(BaseModel):
+    instructions: str = ""
+    error: str = ""
+    files: list[FileInput] = Field(default_factory=list)
+    file_paths: list[str] = Field(default_factory=list)  # optional: full project file index for context
 
 # --- System Prompts ---
 REFINEMENT_SYSTEM_PROMPT = """
@@ -125,7 +170,12 @@ CODE_GEN_PLAN = {
 # --- API Endpoints ---
 @app.get("/")
 async def root():
-    return {"message": "Conversational AI Coder is running!", "status": "healthy"}
+    return {
+        "message": "Conversational AI Coder is running!",
+        "status": "healthy",
+        "azure_ready": AZURE_READY,
+        "model": AZURE_OPENAI_DEPLOYMENT_NAME,
+    }
 
 @app.post("/start-conversation", response_model=StartResponse)
 async def start_conversation():
@@ -147,6 +197,8 @@ async def refine_features(request: ConversationRequest):
     history.append({"role": "user", "content": request.message})
 
     try:
+        if not AZURE_READY or client is None:
+            raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
         response = await client.chat.completions.create(
             model=AZURE_OPENAI_DEPLOYMENT_NAME,
             messages=history,
@@ -159,6 +211,13 @@ async def refine_features(request: ConversationRequest):
         return ConversationResponse(reply=reply, session_id=request.session_id)
     except Exception as e:
         logger.error(f"Error during refinement: {e}")
+        msg = str(e)
+        if "404" in msg and ("Resource not found" in msg or "Not Found" in msg):
+            raise HTTPException(status_code=502, detail=(
+                "Azure returned 404 for chat/completions. Please verify: "
+                "AZURE_OPENAI_DEPLOYMENT_NAME matches your deployment name, and "
+                "AZURE_OPENAI_API_VERSION is valid for your model (e.g., 2025-01-01-preview for GPT-4.1)."
+            ))
         raise HTTPException(status_code=500, detail="AI conversation failed.")
 
 @retry(
@@ -180,6 +239,8 @@ async def run_code_generation(request: GenerateRequest) -> str:
 
     full_output = ""
     try:
+        if not AZURE_READY or client is None:
+            raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
         for section_title, section_task in CODE_GEN_PLAN.items():
             messages.append({"role": "user", "content": section_task})
 
@@ -197,6 +258,11 @@ async def run_code_generation(request: GenerateRequest) -> str:
 
     except Exception as e:
         logger.error(f"Error during generation: {str(e)}")
+        msg = str(e)
+        if "404" in msg and ("Resource not found" in msg or "Not Found" in msg):
+            raise HTTPException(status_code=502, detail=(
+                "Azure returned 404 for chat/completions. Check AZURE_OPENAI_DEPLOYMENT_NAME and set AZURE_OPENAI_API_VERSION to a supported preview (e.g., 2025-01-01-preview for GPT-4.1)."
+            ))
         raise HTTPException(status_code=500, detail=f"Error during code generation: {str(e)}")
 
     return full_output
@@ -210,6 +276,68 @@ async def generate_code(request: GenerateRequest):
         return Response(content=full_output, media_type='text/markdown')
     except Exception as e:
         logger.error(f"Error during generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Edit/Improve existing code ---
+@app.post("/edit")
+async def edit_code(req: EditRequest):
+    try:
+        if not AZURE_READY or client is None:
+            raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
+
+        # Build prompt: provide instruction/error and current files; ask for only modified files in strict format
+        SYSTEM_PROMPT = (
+            "You are an expert software engineer and code editor. Given the user's instructions or a concrete error, "
+            "produce only the updated files needed to implement the change or fix the error. Output strictly as markdown blocks, "
+            "one per changed file, using this exact format: \n\n"
+            "#### path/to/file.ext\n\n```language\n<full file content>\n```\n\n"
+            "Do not include explanations or any other text. If no changes are needed, return an empty response."
+        )
+
+        # Prepare a compact files listing. If too many files, this may be large; MVP keeps it simple.
+        files_text_parts = []
+        for f in req.files:
+            # Heuristic language from extension
+            lang = ""
+            if f.path.endswith((".ts", ".tsx")):
+                lang = "ts"
+            elif f.path.endswith((".js", ".jsx")):
+                lang = "js"
+            elif f.path.endswith(".css"):
+                lang = "css"
+            elif f.path.endswith(".json"):
+                lang = "json"
+            elif f.path.endswith(".md"):
+                lang = "md"
+            files_text_parts.append(f"#### {f.path}\n\n```{lang}\n{f.content}\n```")
+
+        files_context = "\n\n---\n".join(files_text_parts)
+
+        # Lightweight context of full project paths if provided
+        index_section = ("\n\nProject file index (paths only):\n" + "\n".join(req.file_paths)) if req.file_paths else ""
+
+        user_msg = (
+            (f"Instructions:\n{req.instructions}\n\n" if req.instructions else "") +
+            (f"Error:\n{req.error}\n\n" if req.error else "") +
+            "Here are the current relevant files. Apply the change/fix and output only the changed files as strict markdown blocks.\n\n"
+            + files_context + index_section
+        )
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_msg}
+        ]
+
+        resp = await client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            messages=messages,
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        content = resp.choices[0].message.content or ""
+        return Response(content=content, media_type='text/markdown')
+    except Exception as e:
+        logger.error(f"Error during edit: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ import multer from "multer";
 import axios from "axios";
 import { Readable } from "stream";
 import { SignUpUser, SignInUser } from "../controllers/authController";
-import { Project } from "../controllers/Project";
+import { saveGeneratedOutput, listProjects, getProjectDetail, editProject } from "../controllers/projectsController";
 import { updateProfile, updateAvatar, getProfile } from "../controllers/profileController";
 import Allusers from "../controllers/AllUsers";
 import { protect } from "../middleware/authMiddleware";
@@ -12,12 +12,21 @@ import { protect } from "../middleware/authMiddleware";
 const router: Router = Router();
 
 // Debug logging for FastAPI connection
-// Use environment variable first, then fallback to localhost
+// Prefer FASTAPI_URL, else construct from HOST and PORT
+const RAW_FASTAPI_URL = process.env.FASTAPI_URL;
 const FASTAPI_HOST = process.env.FASTAPI_HOST || 'localhost';
-// console.log('FASTAPI_HOST environment variable:', FASTAPI_HOST);
-// console.log('Final FastAPI URL:', `http://${FASTAPI_HOST}:8000`);
-
-const FAST_API = `http://${FASTAPI_HOST}:8000`;
+const FASTAPI_PORT = process.env.FASTAPI_PORT || '8000';
+const FAST_API = ((): string => {
+  if (RAW_FASTAPI_URL) return RAW_FASTAPI_URL.replace(/\/$/, '');
+  // If FASTAPI_HOST already includes a scheme, host, and optionally port, try using it directly
+  if (/^https?:\/\//i.test(FASTAPI_HOST)) {
+    return FASTAPI_HOST.replace(/\/$/, '');
+  }
+  // Ensure host does not include an extra port like host:8000: another :8000 will be appended otherwise
+  const hostPart = FASTAPI_HOST.split(':')[0];
+  return `http://${hostPart}:${FASTAPI_PORT}`;
+})();
+// console.log('FAST_API base:', FAST_API);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -49,7 +58,7 @@ router.post("/api/start-conversation", async (req: Request, res: Response, next:
   }
 });
 
-router.post("/refine", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const handleRefine = async (req: Request, res: Response): Promise<void> => {
   // console.log("refine")
   const { session_id, message } = req.body;
   if (!session_id || !message) {
@@ -62,11 +71,30 @@ router.post("/refine", async (req: Request, res: Response, next: NextFunction): 
     res.status(200).json(response.data);
   } catch (error: any) {
     console.error("Error refining features:", error.message);
-    res.status(error.response?.status || 500).json({ error: error.message || "Failed to refine features" });
+    const status = error.response?.status || 500;
+    const upstream = error.response?.data;
+    res.status(status).json({ error: error.message || "Failed to refine features", upstream });
   }
-});
+};
 
-router.post("/api/generate", protect, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+router.post("/refine", handleRefine);
+// Alias with /api prefix for consistency
+router.post("/api/refine", handleRefine);
+
+const REQUIRE_AUTH_GENERATE = (process.env.REQUIRE_AUTH_GENERATE || 'true').toLowerCase() !== 'false';
+const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false';
+
+const maybeProtect = (req: Request, res: Response, next: NextFunction) => {
+  if (!REQUIRE_AUTH_GENERATE) return next();
+  return (protect as any)(req, res, next);
+};
+
+const maybeProtectProjects = (req: Request, res: Response, next: NextFunction) => {
+  if (!REQUIRE_AUTH_PROJECTS) return next();
+  return (protect as any)(req, res, next);
+};
+
+router.post("/api/generate", maybeProtect, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { session_id } = req.body;
   if (!session_id) {
     res.status(400).json({ error: "session_id is required" });
@@ -106,7 +134,37 @@ router.post("/api/generate", protect, async (req: Request, res: Response, next: 
   }
 });
 
-// Legacy route
-router.post("/generate", protect, Project);
+// Helpful guidance for accidental GET requests
+router.get("/api/generate", (_req: Request, res: Response): void => {
+  res.status(405).json({
+    error: "Method Not Allowed",
+    message: "Use POST /api/generate with JSON body { session_id } and Authorization bearer token.",
+    example: { session_id: "<session-id>" }
+  });
+});
+
+// AI health: check connectivity and surface Azure readiness if exposed
+router.get("/api/ai/health", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { data } = await axios.get(`${FAST_API}/`);
+    res.status(200).json({ ok: true, base: FAST_API, ai: data });
+  } catch (err: any) {
+    const status = err.response?.status || 500;
+    const body = err.response?.data || { message: err.message };
+    res.status(status).json({ ok: false, base: FAST_API, error: body });
+  }
+});
+
+// Persist generated markdown as versioned artifacts
+router.post("/api/projects/:id/save", maybeProtectProjects, saveGeneratedOutput);
+
+// Apply AI-powered edit/fix and create a new version
+router.post("/api/projects/:id/edit", maybeProtectProjects, editProject);
+
+// Project listing and detail
+router.get("/api/projects", maybeProtectProjects, listProjects);
+router.get("/api/projects/:id", maybeProtectProjects, getProjectDetail);
+
+// Legacy route removed: use /api/start-conversation, /refine, and /api/generate instead.
 
 export default router;
