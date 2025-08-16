@@ -1,16 +1,49 @@
 import { Request, Response } from 'express'
-import supabase from '../supabase/supabase'
+import supabase, { getDbClient } from '../supabase/supabase'
 import { parseAiMarkdown } from '../utils/aiMarkdownParser'
 import { AuthenticatedRequest } from '../middleware/authMiddleware'
 import axios from 'axios'
 
+// Flag helper: default to off in non-production unless explicitly enabled
+const isAuthProjectsRequired = (): boolean => {
+    const v = process.env.REQUIRE_AUTH_PROJECTS
+    if (v != null) return v.toLowerCase() !== 'false'
+    return process.env.NODE_ENV === 'production'
+}
+
+// Best-effort: extract user id from Authorization header even when auth middleware is not enforced
+const resolveUserId = async (req: Request & { user?: { id: string } }): Promise<string | undefined> => {
+    if (req.user?.id) return req.user.id
+    const auth = (req.headers?.authorization || '').trim()
+    if (!auth.toLowerCase().startsWith('bearer ')) return undefined
+    const token = auth.slice(7)
+    try {
+        const { data: { user }, error } = await supabase.auth.getUser(token as any)
+        if (error || !user) return undefined
+        return user.id
+    } catch {
+        return undefined
+    }
+}
+
 export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, res: Response) => {
     try {
-        const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false'
-        const userId = req.user?.id
-        // In dev (REQUIRE_AUTH_PROJECTS=false), allow saving without auth by assigning a fallback user id
+        const REQUIRE_AUTH_PROJECTS = isAuthProjectsRequired()
+        const USING_SERVICE_ROLE = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+        // Prefer authenticated user if present (even when auth is not enforced) to satisfy RLS
+        const authHeader = (req.headers?.authorization || '')
+        const userToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : undefined
+        const db = getDbClient(userToken)
+        const headerUserId = await resolveUserId(req as any)
+        const userId = req.user?.id || headerUserId
+        // Fallback user id only if completely unauthenticated
         const fallbackUserId = process.env.DEV_FALLBACK_USER_ID || '00000000-0000-0000-0000-000000000000'
-        const ownerUserId = (REQUIRE_AUTH_PROJECTS ? userId : (userId || fallbackUserId))
+        // If no service role is configured and no authenticated user, saving will fail due to RLS
+        if (!USING_SERVICE_ROLE && !userId) {
+            res.status(401).json({ error: 'Unauthorized: missing user token. Configure SUPABASE_SERVICE_ROLE_KEY in the backend or sign in so we can save under your user.' })
+            return
+        }
+        const ownerUserId = userId || fallbackUserId
         if (REQUIRE_AUTH_PROJECTS && !userId) {
             res.status(401).json({ error: 'Unauthorized' })
             return
@@ -30,11 +63,11 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
                 res.status(400).json({ error: 'title is required to create a new project' })
                 return
             }
-            const create = await supabase.from('projects').insert({ user_id: ownerUserId, title, status: 'draft' }).select('*').single()
+            const create = await db.from('projects').insert({ user_id: ownerUserId, title, status: 'draft' }).select('*').single()
             if (create.error) throw create.error
             project = create.data
         } else {
-            const existing = await supabase.from('projects').select('*').eq('id', projectId).single()
+            const existing = await db.from('projects').select('*').eq('id', projectId).single()
             if (existing.error) {
                 res.status(404).json({ error: 'Project not found' })
                 return
@@ -50,7 +83,7 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
         }
 
         // Determine next version number
-        const { data: versions, error: vErr } = await supabase
+        const { data: versions, error: vErr } = await db
             .from('versions')
             .select('number')
             .eq('project_id', project.id)
@@ -62,7 +95,7 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
         const files = parseAiMarkdown(markdown)
 
         // Insert new version
-        const { data: version, error: iVerErr } = await supabase
+        const { data: version, error: iVerErr } = await db
             .from('versions')
             .insert({ project_id: project.id, number: nextNumber, summary: `Generated version ${nextNumber}` })
             .select('*')
@@ -71,11 +104,11 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
 
         // Insert artifacts
         const artifacts = files.map(f => ({ project_id: project.id, version_id: version.id, path: f.path, content: f.content, sha256: f.sha256 }))
-        const { error: artErr } = await supabase.from('artifacts').insert(artifacts)
+        const { error: artErr } = await db.from('artifacts').insert(artifacts)
         if (artErr) throw artErr
 
         // Update project status and timestamp
-        await supabase.from('projects').update({ status: 'ready', updated_at: new Date().toISOString() }).eq('id', project.id)
+        await db.from('projects').update({ status: 'ready', updated_at: new Date().toISOString() }).eq('id', project.id)
 
         res.status(200).json({ project_id: project.id, version: nextNumber, file_count: files.length })
     } catch (err: any) {
@@ -87,8 +120,9 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
 // List projects for the authenticated user with latest version number
 export const listProjects = async (req: AuthenticatedRequest & Request, res: Response) => {
     try {
-        const userId = req.user?.id
-        const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false'
+        const headerUserId = await resolveUserId(req as any)
+        const userId = req.user?.id || headerUserId
+        const REQUIRE_AUTH_PROJECTS = isAuthProjectsRequired()
 
         const query = supabase
             .from('projects')
@@ -96,7 +130,8 @@ export const listProjects = async (req: AuthenticatedRequest & Request, res: Res
             .order('updated_at', { ascending: false })
             .limit(50)
 
-        if (REQUIRE_AUTH_PROJECTS) {
+        // Apply owner filter when required, or when user id is available to satisfy RLS policies
+        if (REQUIRE_AUTH_PROJECTS || userId) {
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' })
                 return
@@ -148,8 +183,9 @@ export const listProjects = async (req: AuthenticatedRequest & Request, res: Res
 // Get project detail with versions and latest version artifacts
 export const getProjectDetail = async (req: AuthenticatedRequest & Request, res: Response) => {
     try {
-        const userId = req.user?.id
-        const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false'
+        const headerUserId = await resolveUserId(req as any)
+        const userId = req.user?.id || headerUserId
+        const REQUIRE_AUTH_PROJECTS = isAuthProjectsRequired()
         const projectId = (req.params as any)?.id as string | undefined
 
         if (REQUIRE_AUTH_PROJECTS && !userId) {
@@ -321,7 +357,7 @@ const pickRelevantFiles = (
 export const editProject = async (req: AuthenticatedRequest & Request, res: Response) => {
     try {
         const userId = req.user?.id
-        const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false'
+        const REQUIRE_AUTH_PROJECTS = isAuthProjectsRequired()
         const projectId = (req.params as any)?.id as string | undefined
         const { instructions, error } = ((req as unknown as Request).body || {}) as { instructions?: string; error?: string }
 
@@ -453,5 +489,115 @@ export const editProject = async (req: AuthenticatedRequest & Request, res: Resp
         const status = err.response?.status || 500
         const message = err.response?.data?.error || err.message || 'Failed to apply edit'
         res.status(status).json({ error: message })
+    }
+}
+
+// Delete a project and cascade delete its versions, artifacts, and edits
+export const deleteProject = async (req: AuthenticatedRequest & Request, res: Response) => {
+    try {
+        const headerUserId = await resolveUserId(req as any)
+        const userId = req.user?.id || headerUserId
+        const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false'
+        const projectId = (req.params as any)?.id as string | undefined
+
+        if (REQUIRE_AUTH_PROJECTS && !userId) {
+            res.status(401).json({ error: 'Unauthorized' })
+            return
+        }
+        if (!projectId) {
+            res.status(400).json({ error: 'project id is required' })
+            return
+        }
+
+        // Ensure project exists and ownership
+        const { data: project, error: projErr } = await supabase
+            .from('projects')
+            .select('*')
+            .eq('id', projectId)
+            .single()
+        if (projErr) throw projErr
+        if (!project) {
+            res.status(404).json({ error: 'Project not found' })
+            return
+        }
+        if (REQUIRE_AUTH_PROJECTS && project.user_id !== userId) {
+            res.status(403).json({ error: 'Forbidden' })
+            return
+        }
+
+        // Get versions for the project
+        const { data: versions, error: verErr } = await supabase
+            .from('versions')
+            .select('id')
+            .eq('project_id', projectId)
+        if (verErr) throw verErr
+
+        const versionIds = (versions || []).map(v => v.id)
+        if (versionIds.length > 0) {
+            // Delete artifacts tied to these versions
+            const { error: artErr } = await supabase
+                .from('artifacts')
+                .delete()
+                .in('version_id', versionIds as any)
+            if (artErr) throw artErr
+        }
+
+        // Best-effort: delete edits metadata
+        await supabase.from('edits').delete().eq('project_id', projectId)
+
+        // Delete versions
+        const { error: delVerErr } = await supabase
+            .from('versions')
+            .delete()
+            .eq('project_id', projectId)
+        if (delVerErr) throw delVerErr
+
+        // Finally delete the project
+        const { error: delProjErr } = await supabase
+            .from('projects')
+            .delete()
+            .eq('id', projectId)
+        if (delProjErr) throw delProjErr
+
+        res.status(200).json({ ok: true })
+    } catch (err: any) {
+        console.error('deleteProject error', err)
+        res.status(500).json({ error: err.message || 'Failed to delete project' })
+    }
+}
+
+// Create a blank project early (e.g., when starting a chat)
+export const createBlankProject = async (req: AuthenticatedRequest & Request, res: Response) => {
+    try {
+        const REQUIRE_AUTH_PROJECTS = isAuthProjectsRequired()
+        const USING_SERVICE_ROLE = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+        const authHeader = (req.headers?.authorization || '')
+        const userToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : undefined
+        const db = getDbClient(userToken)
+        const headerUserId = await resolveUserId(req as any)
+        const userId = req.user?.id || headerUserId
+        const fallbackUserId = process.env.DEV_FALLBACK_USER_ID || '00000000-0000-0000-0000-000000000000'
+        if (!USING_SERVICE_ROLE && !userId) {
+            res.status(401).json({ error: 'Unauthorized: missing user token. Configure SUPABASE_SERVICE_ROLE_KEY or sign in.' })
+            return
+        }
+        if (REQUIRE_AUTH_PROJECTS && !userId) {
+            res.status(401).json({ error: 'Unauthorized' })
+            return
+        }
+        const ownerUserId = userId || fallbackUserId
+        const { title } = ((req as unknown as Request).body || {}) as { title?: string }
+        const safeTitle = (title && title.trim()) || `Untitled Project ${new Date().toISOString().slice(0, 10)}`
+        const { data: project, error } = await db
+            .from('projects')
+            .insert({ user_id: ownerUserId, title: safeTitle, status: 'draft' })
+            .select('*')
+            .single()
+        if (error) throw error
+        res.status(200).json({ project_id: project.id, title: project.title, status: project.status })
+    } catch (err: any) {
+        const msg = err?.message || 'Failed to create project'
+        console.error('createBlankProject error', msg)
+        res.status(500).json({ error: msg })
     }
 }

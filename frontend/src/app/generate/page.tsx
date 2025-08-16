@@ -17,7 +17,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 
@@ -116,6 +116,8 @@ export default function GeneratePage() {
   // Edit prompt
   const [editText, setEditText] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  type Phase = 'refine' | 'generated'
+  const [phase, setPhase] = useState<Phase>('refine')
 
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
@@ -151,7 +153,7 @@ export default function GeneratePage() {
       mainFileImportPath = mainFileImportPath.slice('src/'.length);
     }
 
-  // Remove file extension
+    // Remove file extension
 
     const files: SandpackFiles = {
       '/public/index.html': { code: indexHtml, hidden: true },
@@ -839,9 +841,11 @@ export default fallbackFunction;`;
           setProjectId(data.project?.id || pid);
           // Rebuild a markdown preview to enable Save button and parity with streamed format
           setFullMarkdown(filesToMarkdown(files));
+          setPhase('generated')
         } else {
           // Still set project id so saving creates version 1
           setProjectId(data.project?.id || pid);
+          setPhase('generated')
         }
       } catch (e) {
         console.error('Failed to load project', e);
@@ -961,11 +965,101 @@ export default fallbackFunction;`;
       setSessionId(data.session_id);
       setMessages([{ id: Date.now().toString(), type: 'assistant', content: data.message, timestamp: new Date() }]);
       toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
+      // Create a blank project early if none exists to avoid RLS issues on first save
+      try {
+        if (!projectId) {
+          const pres = await fetch(`${BASE_URL}/api/projects`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ title: 'Untitled Project' })
+          });
+          if (pres.ok) {
+            const pdata = await pres.json();
+            if (pdata?.project_id) {
+              setProjectId(pdata.project_id);
+              if (user?.id) {
+                localStorage.setItem(`StudAI:lastProjectId:${user.id}`, pdata.project_id);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Pre-create project failed (non-fatal):', e);
+      }
       return data.session_id;
     } catch (err: any) {
       toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     }
   };
+
+  const saveProjectIfNeeded = async (): Promise<string | null> => {
+    try {
+      if (!fullMarkdown) return projectId;
+      const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
+      const targetId = projectId || 'new';
+      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+      });
+      if (res.status === 404 && targetId !== 'new') {
+        res = await fetch(`${BASE_URL}/api/projects/new/save`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+        });
+      }
+      if (!res.ok) return projectId;
+      const data = await res.json();
+      if (data.project_id) {
+        setProjectId(data.project_id);
+        if (user?.id) {
+          localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
+        }
+        return data.project_id as string;
+      }
+      return projectId;
+    } catch {
+      return projectId;
+    }
+  }
+
+  const classifyIntent = (text: string): 'edit' | 'fix' => {
+    const hasErrorWords = /(error|exception|traceback|stack|typeerror|referenceerror|cannot\s+read|undefined|failed|crash|stack trace)/i.test(text);
+    const looksLikeStack = /:\s*\d+(:\d+)?/g.test(text) || /at\s+\S+\s*\(/i.test(text);
+    return (hasErrorWords || looksLikeStack) ? 'fix' : 'edit';
+  }
+
+  const applyEditFromChat = async (messageContent: string) => {
+    if (!projectId) {
+      const saved = await saveProjectIfNeeded();
+      if (!saved) throw new Error('Project must be saved before applying edits');
+    }
+    const intent = classifyIntent(messageContent);
+    const tId = toast.loading(intent === 'fix' ? 'Fixing error…' : 'Applying edit…');
+    try {
+      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(intent === 'fix' ? { error: messageContent } : { instructions: messageContent })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
+      if (arts.length > 0) {
+        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
+        setGeneratedFiles(files);
+        setFileTree(buildFileTree(files));
+        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
+        setFullMarkdown(filesToMarkdown(files));
+      }
+      toast.update(tId, { render: intent === 'fix' ? `Fix applied (v${data.version})` : `Edit applied (v${data.version})`, type: 'success', isLoading: false, autoClose: 2500 });
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: intent === 'fix' ? 'Applied fix to your reported error.' : 'Applied the requested edits.', timestamp: new Date() }]);
+    } catch (e: any) {
+      toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Edit failed: ${e.message}`, timestamp: new Date() }]);
+    }
+  }
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
@@ -974,19 +1068,26 @@ export default fallbackFunction;`;
     setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
     setInput("");
 
+    if (phase === 'generated') {
+      // After code generation, route chat to edits/fixes
+      await applyEditFromChat(messageContent);
+      return;
+    }
+
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
-      let sessionid;
-
-      if (!sessionId) {
-        sessionid = await startConversation();
-        localStorage.setItem("sessionid", sessionid)
+      let currentSession = sessionId || localStorage.getItem("sessionid");
+      if (!currentSession) {
+        currentSession = await startConversation();
+        if (currentSession) {
+          localStorage.setItem("sessionid", currentSession);
+          setSessionId(currentSession);
+        }
       }
-      console.log(sessionid)
-      const res = await fetch(`${BASE_URL}/refine`, {
+      const res = await fetch(`${BASE_URL}/api/refine`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
+        body: JSON.stringify({ session_id: currentSession, message: messageContent }),
       });
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
@@ -1000,10 +1101,16 @@ export default fallbackFunction;`;
   };
 
   const handleGenerateCode = async () => {
-    const sessionid = localStorage.getItem("sessionid");
+    // Ensure a session exists or create one on the fly
+    let sessionid = sessionId || localStorage.getItem("sessionid");
     if (!sessionid) {
-      toast.error("No active conversation session");
-      return;
+      sessionid = await startConversation();
+      if (!sessionid) {
+        toast.error("Couldn't start a conversation");
+        return;
+      }
+      localStorage.setItem("sessionid", sessionid);
+      setSessionId(sessionid);
     }
 
     setIsGenerating(true);
@@ -1046,6 +1153,9 @@ export default fallbackFunction;`;
         }
       }
       setFullMarkdown(responseText);
+      // Move into post-generation phase and ensure a project exists for subsequent edits
+      setPhase('generated');
+      await saveProjectIfNeeded();
       toast.update(loadingToastId, { render: "Code generated!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
@@ -1066,12 +1176,26 @@ export default fallbackFunction;`;
       const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
       // Use existing project id if present, otherwise create new
       const targetId = projectId || 'new';
-      const res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
       });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      // Fallback: if the provided projectId is stale/non-existent, retry as new
+      if (res.status === 404 && targetId !== 'new') {
+        try {
+          res = await fetch(`${BASE_URL}/api/projects/new/save`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+          });
+        } catch (e) { }
+      }
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try { const j = await res.json(); detail = j?.error || j?.message || detail; } catch { }
+        throw new Error(detail);
+      }
       const data = await res.json();
       if (data.project_id) {
         setProjectId(data.project_id);
@@ -1171,7 +1295,7 @@ export default fallbackFunction;`;
   };
 
   const handleQuickAction = (action: string) => {
-    startConversation().then(() => handleSend(`Create a ${action}`));
+    handleSend(`Create a ${action}`);
   };
 
   const copyCode = () => {
@@ -1363,7 +1487,7 @@ export default fallbackFunction;`;
                     size="sm"
                     className="mt-2"
                     onClick={handleGenerateCode}
-                    disabled={isGenerating || !sessionId}
+                    disabled={isGenerating}
                   >
                     Generate Code
                   </Button>
@@ -1521,8 +1645,8 @@ export default fallbackFunction;`;
                         }}
                       >
                         <SandpackLayout style={{ height: "100%", minHeight: 0 }} className="flex-1 min-h-0">
-                          <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} />
-                          <SandpackPreview style={{ height: "calc(100vh - 240px)" }} />
+                          {/* <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} /> */}
+                          <SandpackPreview style={{ height: "calc(100vh - 120px)" }} />
                         </SandpackLayout>
                       </SandpackProvider>
                     )}
