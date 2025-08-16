@@ -1116,8 +1116,17 @@ export default fallbackFunction;`;
   }
 
   useEffect(() => {
+      if (generatedFiles.length > 0) {
+    const tree = buildFileTree(generatedFiles);
+    setFileTree(tree);
+
+    if (!selectedFile) setSelectedFile(generatedFiles[0]);
+
+    const rootFolders = new Set(tree.filter(n => n.type === 'folder').map(n => n.path));
+    setExpandedFolders(rootFolders);
+  }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages,generatedFiles]);
 
   const fixPath = (path: string): string => {
     // Fix common frontend root-level files
@@ -1230,9 +1239,54 @@ const startConversation = async () => {
   console.log("Current project sessions:", projectSessions);
   // If mapping exists, use it
   if (projectSessions[projectName]) {
-    setSessionId(projectSessions[projectName]);
+     if (projectSessions[projectName]) {
+    setSessionId(projectSessions[projectName].sessionId);
+    setHasGenerated(projectSessions[projectName].hasGenerated || false);
+    console.log("Existing session found:", projectSessions[projectName].hasGenerated);
+    const sessionid = projectSessions[projectName].sessionId;
+    const hasGenerateds = projectSessions[projectName].hasGenerated || false;
+    if(hasGenerateds) {
+              if (!sessionid) {
+              toast.error("No active conversation session");
+              return;
+            }
+
+            setIsGenerating(true);
+            setGeneratedFiles([]);
+            setFileTree([]);
+            setSelectedFile(null);
+try {
+  const response = await fetch(`${BASE_URL}/load_llm`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ session_id: sessionid }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const files = await response.json(); // Parse JSON body here
+  console.log("Response received:", files);
+  setHasGenerated(true);
+let filesArray = Object.entries(files).map(([path, content]) => ({
+  path,
+  content,
+}));
+
+  setGeneratedFiles(filesArray);
+} catch (error) {
+  console.error("Failed to load files:", error);
+  // Optionally add error handling state here
+} finally {
+              setIsGenerating(false);
+            }
+    }
+
     toast.success("Resumed existing conversation.");
-    return projectSessions[projectName];
+
+    return projectSessions[projectName].sessionId;
+  }
   }
   console.log("No existing session found, starting a new conversation...");
   // Otherwise, start a new conversation
@@ -1253,8 +1307,12 @@ const startConversation = async () => {
       timestamp: new Date()
     }]);
     // Save the mapping in localStorage
-    projectSessions[projectName] = data.session_id;
-    localStorage.setItem("projectSessions", JSON.stringify(projectSessions));
+    projectSessions[projectName] = {
+      sessionId: data.session_id,
+      hasGenerated: false
+    };
+    setHasGenerated(false);
+    localStorage.setItem("projectSessions", JSON.stringify(projectSessions,));
     console.log("New session started:", data.session_id);
     toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
     return data.session_id;
@@ -1264,7 +1322,16 @@ const startConversation = async () => {
 };
 const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
-    
+    let projectSessions = {};
+      const stored = localStorage.getItem("projectSessions");
+      if (stored) {
+        try {
+          projectSessions = JSON.parse(stored);
+        } catch (e) {
+          projectSessions = {};
+        }
+      }
+      const hasgen= projectSessions[projectName]?.hasGenerated || false;
 
     setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
     setInput("");
@@ -1281,12 +1348,12 @@ const handleSend = async (prompt?: string) => {
       const res = await fetch(`${BASE_URL}/refine`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent, hasGenerated }),
+        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent, hasGenerated: hasgen}),
       });
     
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
-      if (hasGenerated) {
+      if (hasgen) {
         const refinedFiles = parseAIResponse(data.reply);
         const summary= data.work_summary || "";
         if (refinedFiles.length > 0) {
@@ -1337,6 +1404,31 @@ const handleSend = async (prompt?: string) => {
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: sessionid }),
       });
+
+
+      if(!projectName)
+        throw new Error("Project name is required to generate code");
+      let projectSessions = {};
+  const stored = localStorage.getItem("projectSessions");
+  if (stored) {
+    try {
+      projectSessions = JSON.parse(stored);
+    } catch (e) {
+      projectSessions = {};
+    }
+  }
+
+  // Update only if the entry for projectName exists
+  if (projectSessions[projectName]) {
+    projectSessions[projectName].hasGenerated = true;
+    localStorage.setItem("projectSessions", JSON.stringify(projectSessions));
+  } else {
+    // Optionally: handle the case when there's no such project
+    // e.g., create a new entry? Or show an error
+    console.warn(`Project ${projectName} not found in projectSessions.`);
+  }
+
+
       setHasGenerated(true);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

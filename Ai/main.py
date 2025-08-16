@@ -5,7 +5,7 @@ import logging
 import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import openai
@@ -319,6 +319,22 @@ async def generate_code(
         logger.error(f"Error during generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/load_llm")
+async def load_llm(request: GenerateRequest, supabase: AsyncClient = Depends(get_supabase)):
+    if not request.session_id:
+        raise HTTPException(status_code=400, detail="Session ID is required.")
+
+    db_response = await get_llm_outputs(request.session_id, supabase)
+
+    if not db_response:
+        raise HTTPException(status_code=404, detail="No LLM outputs found for this session.")
+
+    session_data = db_response[0].get("llm_output", {})
+    if not session_data or "files" not in session_data or "readme" not in session_data:
+        raise HTTPException(status_code=404, detail="Session or project not found.")
+    files = session_data["files"]
+    print(f"Loaded files for session {request.session_id}: {files}")
+    return JSONResponse(content=files)
 @app.get("/db-health")
 async def db_health(supabase: AsyncClient = Depends(get_supabase)):
     try:

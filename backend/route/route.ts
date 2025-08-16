@@ -82,6 +82,26 @@ router.post("/refine", async (req: Request, res: Response, next: NextFunction): 
   }
 });
 
+
+
+router.post("/load_llm", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // console.log("refine")
+  const { session_id } = req.body;
+  console.log("Refine request:", { session_id});
+  if (!session_id ) {
+    res.status(400).json({ error: "session_id is required" });
+    return;
+  }
+    try {
+      const response = await axios.post(`${FAST_API}/load_llm`, { session_id });
+      res.status(200).json(response.data);
+    } catch (error: any) {
+      console.error("Error loading code", error.message);
+      res.status(error.response?.status || 500).json({ error: error.message || "Failed to load code" });
+    }
+});
+
+
 router.post("/api/generate", protect, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { session_id } = req.body;
   if (!session_id) {
