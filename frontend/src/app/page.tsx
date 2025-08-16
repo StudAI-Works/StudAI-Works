@@ -4,16 +4,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Code, Users, Cloud, Star, Github, Twitter, Linkedin } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Header } from "@/components/header"
-
+import { v4 as uuidv4 } from "uuid";
 // --- 1. IMPORT THE useAuth HOOK ---
 import { useAuth } from "./context/authContext"
+import { useState } from "react"
 
 export default function LandingPage() {
   // --- 2. GET AUTHENTICATION STATE ---
-  const { user, isAuthenticated, logout } = useAuth();
-
+  const { user, token, isAuthenticated, logout } = useAuth();
   // --- 3. PREPARE USER DATA FOR THE HEADER ---
   console.log(user)
   const headerUser = user ? {
@@ -21,6 +21,64 @@ export default function LandingPage() {
     email: user.email,
     avatar: "/placeholder.svg?height=32&width=32", // You can customize avatar later
   } : null;
+  const navigate = useNavigate()
+   const [showProjectModal, setShowProjectModal] = useState(false)
+  const [projectName, setProjectName] = useState("")
+  const [error, setError] = useState<string | null>(null)
+   // Handle "Start Building" click
+  const handleStartBuilding = () => {
+    if (!isAuthenticated) {
+      // Redirect to auth page if not logged in
+      navigate("/auth")
+      return
+    }
+    setShowProjectModal(true)
+  }
+
+  // On submit project name
+  const handleProjectSubmit = () => {
+    console.log("Project Name:", projectName)
+    if (!projectName.trim()) {
+      setError("Please enter a project name")
+      return
+    }
+    setError(null)
+
+    // Generate session ID
+
+    const sessionId = localStorage.getItem("sessionId") 
+    if (!sessionId) {
+      const newSessionId = uuidv4()
+      localStorage.setItem("sessionId", newSessionId)
+    }
+    setShowProjectModal(false)
+    console.log("Navigating to generate page with project name:", projectName)
+    // Navigate to dashboard or generate page with state
+    navigate(`/generate/${encodeURIComponent(projectName)}`)
+  }
+
+  // Modal JSXS
+  const projectModal = (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-96 max-w-full shadow-lg">
+        <h2 className="text-xl font-semibold mb-4">Name Your Project</h2>
+        <input
+          type="text"
+          placeholder="Enter project name"
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)}
+          className="w-full border border-gray-300 rounded px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {error && <p className="text-red-500 mb-2">{error}</p>}
+        <div className="flex justify-end space-x-4">
+          <Button variant="outline" onClick={() => setShowProjectModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleProjectSubmit}>Start</Button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-background">
@@ -42,11 +100,9 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {/* --- 4. INTELLIGENT ROUTING FOR THE MAIN BUTTON --- */}
             {/* If logged in, this button goes to /dashboard. If not, it goes to /auth. */}
-            <Link to={isAuthenticated ? "/dashboard" : "/auth"}>
-              <Button size="lg" className="text-lg px-8 py-6">
-                Start Building <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+              <Button size="lg" className="text-lg px-8 py-6" onClick={handleStartBuilding}>
+              Start Building <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
             <Button variant="outline" size="lg" className="text-lg px-8 py-6 bg-transparent">
               Watch Demo
             </Button>
@@ -112,6 +168,7 @@ export default function LandingPage() {
           <div className="border-t mt-8 pt-8 text-center text-muted-foreground"><p>© 2024 STUDAI EDUTECH PVT. LTD. All rights reserved.</p></div>
         </div>
       </footer>
+       {showProjectModal && projectModal}
     </div>
   )
 }

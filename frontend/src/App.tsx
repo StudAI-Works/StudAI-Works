@@ -39,6 +39,8 @@ function App() {
               <Route path='/account' element={<AccountPage />} />
               <Route path='/editor' element={<EditorPage />} />
               <Route path='/generate' element={<GeneratePage />} />
+              <Route path='/generate/:projectName' element={<GeneratePage />} />
+              <Route path='/generate/:projectName/:sessionId' element={<GeneratePage />} />
               <Route path='/help' element={<HelpPage />} />
               <Route path='/studaiadmin' element={<Admin/>} />
               

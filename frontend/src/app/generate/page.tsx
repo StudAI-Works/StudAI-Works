@@ -21,6 +21,8 @@ import { useAuth } from "../context/authContext";
 import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview,useSandpack,useSandpackConsole } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
+import { useParams } from "react-router-dom";
+
 import { se } from "date-fns/locale";
 
 // Interfaces
@@ -421,7 +423,7 @@ export default function GeneratePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
-
+const { projectName } = useParams();
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
 
@@ -1207,24 +1209,59 @@ export default fallbackFunction;`;
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
 
-  const startConversation = async () => {
-    const loadingToastId = toast.loading("Starting conversation...");
+
+const startConversation = async () => {
+  if (!projectName) {
+    toast.error("Project name missing from URL");
+    return;
+  }
+  console.log("Starting conversation for project:", projectName);
+
+  // Retrieve or parse the mappings from localStorage
+  let projectSessions = {};
+  const stored = localStorage.getItem("projectSessions");
+  if (stored) {
     try {
-      const res = await fetch(`${BASE_URL}/api/start-conversation`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      console.log(data)
-      setSessionId(data.session_id);
-      setMessages([{ id: Date.now().toString(), type: 'assistant', content: data.message, timestamp: new Date() }]);
-      toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
-      return data.session_id;
-    } catch (err: any) {
-      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+      projectSessions = JSON.parse(stored);
+    } catch (e) {
+      projectSessions = {};
     }
-  };
+  }
+  console.log("Current project sessions:", projectSessions);
+  // If mapping exists, use it
+  if (projectSessions[projectName]) {
+    setSessionId(projectSessions[projectName]);
+    toast.success("Resumed existing conversation.");
+    return projectSessions[projectName];
+  }
+  console.log("No existing session found, starting a new conversation...");
+  // Otherwise, start a new conversation
+  const loadingToastId = toast.loading("Starting conversation...");
+  try {
+    const res = await fetch(`${BASE_URL}/api/start-conversation`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ project_name: projectName }) // Send project name if your backend supports it
+    });
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const data = await res.json();
+    setSessionId(data.session_id);
+    setMessages([{
+      id: Date.now().toString(),
+      type: 'assistant',
+      content: data.message,
+      timestamp: new Date()
+    }]);
+    // Save the mapping in localStorage
+    projectSessions[projectName] = data.session_id;
+    localStorage.setItem("projectSessions", JSON.stringify(projectSessions));
+    console.log("New session started:", data.session_id);
+    toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
+    return data.session_id;
+  } catch (err: any) {
+    toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+  }
+};
 const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
     
