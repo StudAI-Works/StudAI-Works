@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,30 +9,32 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder } from "lucide-react";
 import { Header } from "@/components/header";
+import { useNavigate } from "react-router-dom";
 import { Sidebar } from "@/components/dashboard-sidebar";
 import { useAuth } from "../context/authContext";
+import { toast } from "react-toastify";
+type ProjectType = {
+  description: any;
+  name: string;
+  lastModified: string;
+  status: string;
+};
 
-const mockProjects = [
-  { id: 1, name: "E-commerce Dashboard", description: "Modern React dashboard for online store management", lastModified: "2 hours ago", status: "active", type: "React", },
-  { id: 2, name: "Task Management App", description: "Full-stack task management with real-time updates", lastModified: "1 day ago", status: "deployed", type: "Next.js", },
-  { id: 3, name: "Portfolio Website", description: "Personal portfolio with blog and project showcase", lastModified: "3 days ago", status: "draft", type: "Static", },
-  { id: 4, name: "API Documentation", description: "Interactive API documentation with examples", lastModified: "1 week ago", status: "active", type: "Docs", },
-];
+  const BASE_URL = "http://localhost:8080";
 
 export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [projects] = useState(mockProjects);
-  const { user, logout } = useAuth();
 
+  const { user,token, logout } = useAuth();
+  const [userProjects, setUserProjects] = useState<ProjectType[]>([]);
+  const handleEditClick = (projectName: string) => {
+  const encodedName = encodeURIComponent(projectName);
+  navigate(`/generate/${encodedName}`);
+};
+  const navigate = useNavigate();
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
-
-  const filteredProjects = projects.filter(
-    (project) =>
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -49,6 +51,42 @@ export default function DashboardPage() {
     email: user.email,
     avatar: "/placeholder.svg?height=32&width=32",
   };
+  useEffect(() => {
+  const fetchUserProjects = async () => {
+    toast.info("Loading your projects...")
+    try {
+      const res = await fetch(`${BASE_URL}/projects`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        }, // your auth headers function
+      });
+      if (!res.ok) throw new Error(`Error fetching projects: ${res.status}`);
+      
+      const data = await res.json();
+      console.log("Fetched projects:", data);
+      const mappedUserProjects = data.map(p => ({
+        name: p.Project_Name || "Untitled",
+        lastModified: new Date(p.created_at).toLocaleDateString(), // Format date nicely
+        status: "active", // Or map from backend if you have status field
+      }));
+      setUserProjects(mappedUserProjects|| []);
+    } catch (error) {
+      console.error("Failed to load projects:", error);
+    } finally {
+      toast.dismiss();
+    }
+  };
+
+  fetchUserProjects();
+}, []);
+
+  const filteredProjects = userProjects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      project.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -103,8 +141,9 @@ export default function DashboardPage() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                        <DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(project.name)}>
+  <Edit className="mr-2 h-4 w-4" />Edit
+</DropdownMenuItem>
                           <DropdownMenuItem><Copy className="mr-2 h-4 w-4" />Duplicate</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                         </DropdownMenuContent>

@@ -9,9 +9,18 @@ import { updateProfile, updateAvatar, getProfile } from "../controllers/profileC
 import Allusers from "../controllers/AllUsers";
 import { protect } from "../middleware/authMiddleware";
 import dotenv from "dotenv"
+import { createClient } from "@supabase/supabase-js";
+
+
 const router: Router = Router();
 
 dotenv.config()
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
+console.log("Supabase URL:", SUPABASE_URL);
+console.log("Supabase Key:", SUPABASE_KEY ? "Loaded" : "Not Loaded");
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Debug logging for FastAPI connection
 // Use environment variable first, then fallback to localhost
 const FASTAPI_HOST = 'localhost';
@@ -83,6 +92,67 @@ router.post("/refine", async (req: Request, res: Response, next: NextFunction): 
 });
 
 
+router.post ('/saveProject' , async (req: Request, res: Response, next: NextFunction) : Promise<void> => {
+  const { session_id, projectName } = req.body;
+  console.log("Save project request:", { session_id, projectName });
+  if (!session_id || !projectName) {
+    res.status(400).json({ error: "session_id and projectName are required" });
+  }
+
+  try {
+    // Check if project already exists with this session_id
+    const { data: existing, error: selectErr } = await supabase
+      .from("Project")
+      .select("*")
+      .eq("id", session_id);
+    if (selectErr) {
+      throw selectErr;
+    }
+    console.log("Existing projects:", existing);
+    if (existing && existing.length > 0) {
+      res.status(200).json({ message: "Project already saved", id: existing[0].id });
+    }
+
+    // Insert new project
+    const { data, error: insertErr } = await supabase
+      .from("Project")
+      .insert([
+        {
+          id: session_id,
+          Project_Name: projectName,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    console.log("Insert result:", data);
+
+    if (insertErr) {
+      throw insertErr;
+    }
+
+    res.status(200).json({ message: "Project saved", id: session_id });
+  } catch (error: any) {
+    console.error("Error saving project:", error.message);
+    res.status(500).json({ error: error.message || "Failed to save project" });
+  }
+});
+
+router.get("/projects",async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try { 
+    const { data, error } = await supabase
+      .from("Project")
+      .select("*")
+      .order("created_at", { ascending: false }); 
+
+    if (error) {
+      throw error;
+    }
+    res.status(200).json(data);
+  }
+  catch (error: any) {
+    console.error("Error fetching projects:", error.message);
+    res.status(500).json({ error: error.message || "Failed to fetch projects" });
+  }
+});
 
 router.post("/load_llm", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   // console.log("refine")

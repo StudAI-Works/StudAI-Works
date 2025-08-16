@@ -14,7 +14,8 @@ import { useState } from "react"
 export default function LandingPage() {
   // --- 2. GET AUTHENTICATION STATE ---
   const { user, token, isAuthenticated, logout } = useAuth();
-  // --- 3. PREPARE USER DATA FOR THE HEADER ---
+  const BASE_URL = "http://localhost:8080";
+  // --- 3. PREPARE USER DATA FOR THE HEADER -
   console.log(user)
   const headerUser = user ? {
     name: user.fullName || "New User",
@@ -36,7 +37,7 @@ export default function LandingPage() {
   }
 
   // On submit project name
-  const handleProjectSubmit = () => {
+  const handleProjectSubmit = async () => {
     console.log("Project Name:", projectName)
     if (!projectName.trim()) {
       setError("Please enter a project name")
@@ -45,11 +46,19 @@ export default function LandingPage() {
     setError(null)
 
     // Generate session ID
-
-    const sessionId = localStorage.getItem("sessionId") 
-    if (!sessionId) {
-      const newSessionId = uuidv4()
-      localStorage.setItem("sessionId", newSessionId)
+    const sessionId = uuidv4()
+    const response = await fetch(`${BASE_URL}/saveProject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`, // Use the token from useAuth
+        },
+        body: JSON.stringify({ session_id: sessionId, projectName: projectName }),
+      });
+    if (!response.ok) {
+      console.error("Failed to start project:", response.statusText)
+      setError("Failed to start project. Please try again.")
+      return
     }
     setShowProjectModal(false)
     console.log("Navigating to generate page with project name:", projectName)
