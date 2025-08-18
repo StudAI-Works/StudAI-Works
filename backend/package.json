@@ -28,6 +28,8 @@
     "openai": "^5.12.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "supabase": "^2.30.4",
     "zustand": "^5.0.7"
   },

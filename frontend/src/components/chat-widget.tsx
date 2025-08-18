@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { MessageCircle, X, Send, Bot, User, Minimize2 } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+
 
 interface ChatMessage {
   id: string
@@ -144,8 +147,16 @@ const handleSend = async () => {
                         {message.type === "bot" && <Bot className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                         {message.type === "user" && <User className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                         <div>
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                          <p className="text-xs opacity-70 mt-1">{message.timestamp.toLocaleTimeString()}</p>
+                          {/* --- CHANGE IS HERE --- */}
+                          <div className="text-sm whitespace-pre-wrap">
+                          <ReactMarkdown  remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                          </div>
+                          {/* --- END OF CHANGE --- */}
+                          <p className="text-xs opacity-70 mt-1">
+                            {message.timestamp.toLocaleTimeString()}
+                          </p>
                         </div>
                       </div>
                     </div>
