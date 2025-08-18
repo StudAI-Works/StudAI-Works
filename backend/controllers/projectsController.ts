@@ -7,13 +7,40 @@ import axios from 'axios'
 export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, res: Response) => {
     try {
         const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false'
-        const userId = req.user?.id
-        // In dev (REQUIRE_AUTH_PROJECTS=false), allow saving without auth by assigning a fallback user id
-        const fallbackUserId = process.env.DEV_FALLBACK_USER_ID || '00000000-0000-0000-0000-000000000000'
-        const ownerUserId = (REQUIRE_AUTH_PROJECTS ? userId : (userId || fallbackUserId))
-        if (REQUIRE_AUTH_PROJECTS && !userId) {
+        const tokenUserId = req.user?.id
+        // Resolve owner user id: prefer token, else opt-in headers, else explicit dev fallback
+        let ownerUserId: string | undefined = tokenUserId
+        if (!ownerUserId && !REQUIRE_AUTH_PROJECTS) {
+            const headerUserId = (req.headers['x-user-id'] || req.headers['x-userid'] || req.headers['x-user'] || '') as string
+            if (headerUserId && /^[0-9a-fA-F-]{36}$/.test(headerUserId.trim())) {
+                ownerUserId = headerUserId.trim()
+            }
+            if (!ownerUserId && process.env.DEV_FALLBACK_USER_ID) {
+                ownerUserId = process.env.DEV_FALLBACK_USER_ID
+            }
+        }
+        if (REQUIRE_AUTH_PROJECTS && !ownerUserId) {
             res.status(401).json({ error: 'Unauthorized' })
             return
+        }
+
+        // Validate that the owner user exists (profiles table mirrors auth.users ids)
+        if (!ownerUserId) {
+            res.status(400).json({ error: 'Owner user id is required. Sign in to provide a bearer token or set DEV_FALLBACK_USER_ID to an existing user id.' })
+            return
+        }
+        const { data: ownerProfile, error: ownerMissing } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', ownerUserId)
+            .maybeSingle()
+        if (!ownerProfile) {
+            // Fallback: check auth.users via admin API (service role key required)
+            const { data: authUser, error: adminErr } = await supabase.auth.admin.getUserById(ownerUserId)
+            if (adminErr || !authUser?.user) {
+                res.status(400).json({ error: 'User not found', guidance: 'Sign in so Authorization maps to auth.users id, or set DEV_FALLBACK_USER_ID to an existing auth user id.' })
+                return
+            }
         }
 
         const projectId = (req.params as any)?.id as string | undefined
@@ -34,19 +61,36 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
             if (create.error) throw create.error
             project = create.data
         } else {
-            const existing = await supabase.from('projects').select('*').eq('id', projectId).single()
-            if (existing.error) {
-                res.status(404).json({ error: 'Project not found' })
-                return
-            }
-            // Enforce ownership only when auth is required
-            if (REQUIRE_AUTH_PROJECTS) {
-                if (existing.data.user_id !== userId) {
-                    res.status(403).json({ error: 'Forbidden' })
+            const { data: existing, error: existingErr } = await supabase
+                .from('projects')
+                .select('*')
+                .eq('id', projectId)
+                .single()
+
+            if (existingErr || !existing) {
+                // If a specific id is provided but not found, be forgiving and create a new project
+                // (ignore the provided id; let DB assign one). Require a title to proceed.
+                if (!title) {
+                    res.status(400).json({ error: 'Project not found. Provide a title to create a new project or use id "new".' })
                     return
                 }
+                const create = await supabase
+                    .from('projects')
+                    .insert({ user_id: ownerUserId, title, status: 'draft' })
+                    .select('*')
+                    .single()
+                if (create.error) throw create.error
+                project = create.data
+            } else {
+                // Enforce ownership only when auth is required
+                if (REQUIRE_AUTH_PROJECTS) {
+                    if (existing.user_id !== tokenUserId) {
+                        res.status(403).json({ error: 'Forbidden' })
+                        return
+                    }
+                }
+                project = existing
             }
-            project = existing.data
         }
 
         // Determine next version number
@@ -79,8 +123,22 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
 
         res.status(200).json({ project_id: project.id, version: nextNumber, file_count: files.length })
     } catch (err: any) {
-        console.error('saveGeneratedOutput error', err)
-        res.status(500).json({ error: err.message || 'Failed to save generated output' })
+        // Surface useful diagnostic info for DB/setup issues
+        const code = err?.code || err?.response?.data?.code
+        const details = err?.details || err?.response?.data?.details
+        const hint = err?.hint || err?.response?.data?.hint
+        const msg = err?.message || 'Failed to save generated output'
+        console.error('saveGeneratedOutput error', { code, msg, details, hint })
+
+        // Common guidance
+        let guidance = undefined as string | undefined
+        if (typeof msg === 'string' && /relation .* does not exist/i.test(msg) || code === '42P01') {
+            guidance = 'Database schema is missing. Run backend/supabase/schema.sql in your Supabase SQL editor.'
+        } else if (/permission denied/i.test(msg)) {
+            guidance = 'Permission denied. Use the Supabase service role key in backend .env or adjust RLS.'
+        }
+
+        res.status(500).json({ error: msg, code, details, hint, guidance })
     }
 }
 

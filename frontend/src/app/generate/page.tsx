@@ -151,7 +151,7 @@ export default function GeneratePage() {
       mainFileImportPath = mainFileImportPath.slice('src/'.length);
     }
 
-  // Remove file extension
+    // Remove file extension
 
     const files: SandpackFiles = {
       '/public/index.html': { code: indexHtml, hidden: true },
@@ -976,18 +976,30 @@ export default fallbackFunction;`;
 
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
-      let sessionid;
-
-      if (!sessionId) {
-        sessionid = await startConversation();
-        localStorage.setItem("sessionid", sessionid)
+      // Ensure we have a valid session id from backend before refining
+      let activeSessionId = sessionId;
+      if (!activeSessionId) {
+        activeSessionId = await startConversation();
+        // Optionally persist for UX, but do not rely on it for correctness
+        try { localStorage.setItem("sessionid", String(activeSessionId)); } catch { }
       }
-      console.log(sessionid)
-      const res = await fetch(`${BASE_URL}/refine`, {
+
+      let res = await fetch(`${BASE_URL}/refine`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
+        body: JSON.stringify({ session_id: activeSessionId, message: messageContent }),
       });
+
+      // If AI in-memory sessions were reset, recover by starting a new session and retrying once
+      if (res.status === 404) {
+        activeSessionId = await startConversation();
+        try { localStorage.setItem("sessionid", String(activeSessionId)); } catch { }
+        res = await fetch(`${BASE_URL}/refine`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ session_id: activeSessionId, message: messageContent }),
+        });
+      }
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
@@ -1014,7 +1026,7 @@ export default fallbackFunction;`;
     const loadingToastId = toast.loading("Generating code...");
 
     try {
-      const response = await fetch(`${BASE_URL}/api/generate`, {
+      const response = await fetch(`http://localhost:8000/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: sessionid }),
@@ -1066,11 +1078,19 @@ export default fallbackFunction;`;
       const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
       // Use existing project id if present, otherwise create new
       const targetId = projectId || 'new';
-      const res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
       });
+      // If the project id doesn't exist (e.g., DB was reset), fallback to creating a new project
+      if (res.status === 404) {
+        res = await fetch(`${BASE_URL}/api/projects/new/save`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+        });
+      }
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.project_id) {
@@ -1521,7 +1541,7 @@ export default fallbackFunction;`;
                         }}
                       >
                         <SandpackLayout style={{ height: "100%", minHeight: 0 }} className="flex-1 min-h-0">
-                          <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} />
+                          {/* <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} /> */}
                           <SandpackPreview style={{ height: "calc(100vh - 240px)" }} />
                         </SandpackLayout>
                       </SandpackProvider>

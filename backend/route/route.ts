@@ -90,8 +90,14 @@ const maybeProtect = (req: Request, res: Response, next: NextFunction) => {
 };
 
 const maybeProtectProjects = (req: Request, res: Response, next: NextFunction) => {
-  if (!REQUIRE_AUTH_PROJECTS) return next();
-  return (protect as any)(req, res, next);
+  // If auth is required, always protect
+  if (REQUIRE_AUTH_PROJECTS) return (protect as any)(req, res, next);
+  // If not required but a bearer token is provided, populate req.user for ownership
+  const authz = req.headers?.authorization || '';
+  if (typeof authz === 'string' && /^Bearer\s+\S+/.test(authz)) {
+    return (protect as any)(req, res, next);
+  }
+  return next();
 };
 
 router.post("/api/generate", maybeProtect, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -108,7 +114,7 @@ router.post("/api/generate", maybeProtect, async (req: Request, res: Response, n
 
     const response = await axios({
       method: "post",
-      url: `${FAST_API}/generate`,
+      url: `${FAST_API}/api/generate`,
       data: { session_id },
       responseType: "stream",
     }) as unknown as { data: Readable };
