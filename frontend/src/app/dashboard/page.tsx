@@ -189,7 +189,7 @@ export default function DashboardPage() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery ? "Try adjusting your search terms" : "Create your first project to get started"}
                 </p>
-                <Link to="/editorpage">
+                <Link to="/generate">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Create New Project
