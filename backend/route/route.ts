@@ -141,12 +141,12 @@ router.post ('/saveProject' , async (req: Request, res: Response, next: NextFunc
 router.post("/chatbot", async (req, res) => {
   console.log("Chatbot request received:", req.body);
   try {
-    const { prompt } = req.body;
+    const { prompt,url } = req.body;
 try {
   const response = await client.chat.completions.create({
   model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
   messages: [
-    { role: "system", content: systemPrompt },
+    { role: "system", content: systemPrompt+ `\n\nCurrent URL: ${url}` },
     { role: "user", content: prompt }
   ],
   temperature: 0.7,

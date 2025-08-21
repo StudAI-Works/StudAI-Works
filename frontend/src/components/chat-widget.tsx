@@ -55,10 +55,13 @@ const handleSend = async () => {
   setIsTyping(true);
 
   try {
+    const currentUrl = window.location.href;
     const res = await fetch("http://localhost:8080/chatbot", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: input }),
+      body: JSON.stringify({ prompt: input 
+        , url: currentUrl
+      }),
     });
 
     if (!res.ok) throw new Error("Failed to fetch");
