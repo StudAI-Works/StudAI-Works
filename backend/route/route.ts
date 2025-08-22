@@ -12,9 +12,10 @@ import dotenv from "dotenv"
 import { createClient } from "@supabase/supabase-js";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import client from "../src/lib/azureOpenAI";
-import systemPrompt  from "../route/prompt";
+import systemPrompt from "../route/prompt";
 const router: Router = Router();
-type NextResponse = { json: (data: any, options?: { status?: number }) => void;
+type NextResponse = {
+  json: (data: any, options?: { status?: number }) => void;
 };
 dotenv.config()
 const SUPABASE_URL = process.env.SUPABASE_URL!;
@@ -29,7 +30,7 @@ const FASTAPI_HOST = 'localhost';
 // console.log('FASTAPI_HOST environment variable:', FASTAPI_HOST);
 console.log('Final FastAPI URL:', `http://${FASTAPI_HOST}:8000`);
 
-const FAST_API = `http://${FASTAPI_HOST}:8000`; 
+const FAST_API = `http://${FASTAPI_HOST}:8000`;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -65,15 +66,14 @@ router.post("/api/start-conversation", async (req: Request, res: Response, next:
 
 router.post("/refine", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   // console.log("refine")
-  const { session_id, message,hasGenerated } = req.body;
+  const { session_id, message, hasGenerated } = req.body;
   console.log("Refine request:", { session_id, message, hasGenerated });
   if (!session_id || !message) {
     res.status(400).json({ error: "session_id and message are required" });
     return;
   }
 
-  if(hasGenerated)
-  {
+  if (hasGenerated) {
     try {
       const response = await axios.post(`${FAST_API}/parse-text`, { session_id, message });
       res.status(200).json(response.data);
@@ -82,8 +82,7 @@ router.post("/refine", async (req: Request, res: Response, next: NextFunction): 
       res.status(error.response?.status || 500).json({ error: error.message || "Failed to refine features" });
     }
   }
-  else
-  {
+  else {
     try {
       const response = await axios.post(`${FAST_API}/refine`, { session_id, message });
       res.status(200).json(response.data);
@@ -95,7 +94,7 @@ router.post("/refine", async (req: Request, res: Response, next: NextFunction): 
 });
 
 
-router.post ('/saveProject' , async (req: Request, res: Response, next: NextFunction) : Promise<void> => {
+router.post('/saveProject', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { session_id, projectName } = req.body;
   console.log("Save project request:", { session_id, projectName });
   if (!session_id || !projectName) {
@@ -141,36 +140,36 @@ router.post ('/saveProject' , async (req: Request, res: Response, next: NextFunc
 router.post("/chatbot", async (req, res) => {
   console.log("Chatbot request received:", req.body);
   try {
-    const { prompt,url } = req.body;
-try {
-  const response = await client.chat.completions.create({
-  model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
-  messages: [
-    { role: "system", content: systemPrompt+ `\n\nCurrent URL: ${url}` },
-    { role: "user", content: prompt }
-  ],
-  temperature: 0.7,
-  max_tokens: 1000,
-});
-  console.log("OpenAI response:", response);
-  
-    const botResponse = response.choices[0].message.content;
-  console.log("Bot response:", botResponse);
-    res.json({ response: botResponse });
-} catch (err) {
-  console.error("OpenAI API Error:", err);
-}
-    
+    const { prompt, url } = req.body;
+    try {
+      const response = await client.chat.completions.create({
+        model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
+        messages: [
+          { role: "system", content: systemPrompt + `\n\nCurrent URL: ${url}` },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+      console.log("OpenAI response:", response);
+
+      const botResponse = response.choices[0].message.content;
+      console.log("Bot response:", botResponse);
+      res.json({ response: botResponse });
+    } catch (err) {
+      console.error("OpenAI API Error:", err);
+    }
+
   } catch (error) {
     res.status(500).json({ response: "Error generating AI response." });
   }
 });
-router.get("/projects",async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try { 
+router.get("/projects", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
     const { data, error } = await supabase
       .from("Project")
       .select("*")
-      .order("created_at", { ascending: false }); 
+      .order("created_at", { ascending: false });
 
     if (error) {
       throw error;
@@ -186,18 +185,18 @@ router.get("/projects",async (req: Request, res: Response, next: NextFunction): 
 router.post("/load_llm", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   // console.log("refine")
   const { session_id } = req.body;
-  console.log("Refine request:", { session_id});
-  if (!session_id ) {
+  console.log("Refine request:", { session_id });
+  if (!session_id) {
     res.status(400).json({ error: "session_id is required" });
     return;
   }
-    try {
-      const response = await axios.post(`${FAST_API}/load_llm`, { session_id });
-      res.status(200).json(response.data);
-    } catch (error: any) {
-      console.error("Error loading code", error.message);
-      res.status(error.response?.status || 500).json({ error: error.message || "Failed to load code" });
-    }
+  try {
+    const response = await axios.post(`${FAST_API}/load_llm`, { session_id });
+    res.status(200).json(response.data);
+  } catch (error: any) {
+    console.error("Error loading code", error.message);
+    res.status(error.response?.status || 500).json({ error: error.message || "Failed to load code" });
+  }
 });
 
 
