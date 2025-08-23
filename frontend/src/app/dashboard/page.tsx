@@ -1,67 +1,86 @@
 "use client"
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder, History } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder, RefreshCcw } from "lucide-react";
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/dashboard-sidebar";
 import { useAuth } from "../context/authContext";
 import { HistoryPanel } from "@/components/HistoryPanel";
 
-const mockProjects = [
-  {
-    id: 1,
-    name: "E-commerce Dashboard",
-    description: "Modern React dashboard for online store management",
-    lastModified: "2 hours ago",
-    status: "active",
-    type: "React",
-  },
-  {
-    id: 2,
-    name: "Task Management App",
-    description: "Full-stack task management with real-time updates",
-    lastModified: "1 day ago",
-    status: "deployed",
-    type: "Next.js",
-  },
-  {
-    id: 3,
-    name: "Portfolio Website",
-    description: "Personal portfolio with blog and project showcase",
-    lastModified: "3 days ago",
-    status: "draft",
-    type: "Static",
-  },
-  {
-    id: 4,
-    name: "API Documentation",
-    description: "Interactive API documentation with examples",
-    lastModified: "1 week ago",
-    status: "active",
-    type: "Docs",
-  },
-];
+type ProjectItem = {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  latest_version: number;
+};
+
+const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
+
+const formatRelativeTime = (iso: string): string => {
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diff = Math.max(0, Math.floor((now - then) / 1000));
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  const days = Math.floor(diff / 86400);
+  return days === 1 ? "1 day ago" : `${days} days ago`;
+};
 
 export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [projects] = useState(mockProjects);
-  const [activeView, setActiveView] = useState<"projects" | "history">("projects");
-  const { user, logout } = useAuth();
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user, token, logout, isLoading } = useAuth() as any;
 
-  if (!user) {
+  if (!user && !isLoading) {
     return <Navigate to="/auth" replace />;
   }
 
-  const filteredProjects = projects.filter(
-    (project) =>
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const fetchProjects = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${BASE_URL}/api/projects`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: ProjectItem[] = await res.json();
+      setProjects(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token || !REQUIRE_AUTH_FLAG_FOR_CLIENT_SIDE()) {
+      fetchProjects();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Helper: client-side check if backend enforces auth for projects
+  function REQUIRE_AUTH_FLAG_FOR_CLIENT_SIDE() {
+    // We can’t read server env here; assume true. Fetch will still work if backend bypass is on.
+    return true;
+  }
+
+  const filteredProjects = projects.filter((project) =>
+    project.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getStatusColor = (status: string) => {
@@ -103,130 +122,86 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="flex space-x-4 mb-6">
-              <Button
-                variant={activeView === "projects" ? "default" : "outline"}
-                onClick={() => setActiveView("projects")}
-              >
-                <Folder className="mr-2 h-4 w-4" />
-                Projects
-              </Button>
-              <Button
-                variant={activeView === "history" ? "default" : "outline"}
-                onClick={() => setActiveView("history")}
-              >
-                <History className="mr-2 h-4 w-4" />
-                History
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search projects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Link to="/generate">
+                <Button className="w-full sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create New Project
+                </Button>
+              </Link>
+              <Button variant="outline" className="w-full sm:w-auto" onClick={fetchProjects} disabled={loading}>
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                {loading ? 'Refreshing...' : 'Refresh'}
               </Button>
             </div>
 
-            {activeView === "projects" ? (
-              <>
-                <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input
-                      placeholder="Search projects..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Link to="/generate">
-                    <Button className="w-full sm:w-auto">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create New Project
-                    </Button>
-                  </Link>
-                </div>
+            {error && (
+              <div className="mb-4 text-sm text-destructive">{error}</div>
+            )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProjects.map((project) => (
-                    <Card
-                      key={project.id}
-                      className="hover:shadow-lg transition-shadow cursor-pointer group"
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Folder className="h-5 w-5 text-primary" />
-                            <Badge
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {project.type}
-                            </Badge>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Copy className="mr-2 h-4 w-4" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredProjects.map((project) => (
+                <Link key={project.id} to={`/generate?project=${project.id}`} className="block">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Folder className="h-5 w-5 text-primary" />
+                          <Badge variant="secondary" className="text-xs">v{project.latest_version || 0}</Badge>
                         </div>
-                        <CardTitle className="text-lg">
-                          {project.name}
-                        </CardTitle>
-                        <CardDescription className="line-clamp-2">
-                          {project.description}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span>{project.lastModified}</span>
-                          </div>
-                          <Badge className={getStatusColor(project.status)}>
-                            {project.status}
-                          </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                            <DropdownMenuItem><Copy className="mr-2 h-4 w-4" />Duplicate</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <CardTitle className="text-lg">{project.title || 'Untitled Project'}</CardTitle>
+                      <CardDescription className="line-clamp-2">Latest version: v{project.latest_version || 0}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatRelativeTime(project.updated_at || project.created_at)}</span>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
 
-                {filteredProjects.length === 0 && (
-                  <div className="text-center py-12">
-                    <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No projects found
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      {searchQuery
-                        ? "Try adjusting your search terms"
-                        : "Create your first project to get started"}
-                    </p>
-                    <Link to="/editorpage">
-                      <Button>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create New Project
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </>
-            ) : (
-              <HistoryPanel />
+            {filteredProjects.length === 0 && !loading && (
+              <div className="text-center py-12">
+                <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No projects found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery ? "Try adjusting your search terms" : "Create your first project to get started"}
+                </p>
+                <Link to="/editorpage">
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create New Project
+                  </Button>
+                </Link>
+              </div>
             )}
           </div>
         </main>
