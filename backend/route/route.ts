@@ -138,33 +138,37 @@ router.post ('/saveProject' , async (req: Request, res: Response, next: NextFunc
     res.status(500).json({ error: error.message || "Failed to save project" });
   }
 });
+
+const convHistory: ChatCompletionMessageParam[] = [
+  { role: "system", content: "" },
+];
+
 router.post("/chatbot", async (req, res) => {
   console.log("Chatbot request received:", req.body);
-  try {
     const { prompt,url } = req.body;
+    convHistory.push({ role: "user", content: prompt });
 try {
   const response = await client.chat.completions.create({
   model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
   messages: [
-    { role: "system", content: systemPrompt+ `\n\nCurrent URL: ${url}` },
-    { role: "user", content: prompt }
+    { role: "system", content: systemPrompt+ `\n\nCurrent URL of the user is: ${url}` },
+    ...convHistory.slice(-10)
   ],
   temperature: 0.7,
   max_tokens: 1000,
 });
   console.log("OpenAI response:", response);
-  
+  convHistory.push({ role: "assistant", content: response.choices[0].message.content || "" });
     const botResponse = response.choices[0].message.content;
   console.log("Bot response:", botResponse);
     res.json({ response: botResponse });
 } catch (err) {
   console.error("OpenAI API Error:", err);
 }
-    
-  } catch (error) {
-    res.status(500).json({ response: "Error generating AI response." });
-  }
 });
+
+
+
 router.get("/projects",async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try { 
     const { data, error } = await supabase
