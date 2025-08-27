@@ -63,12 +63,9 @@ export const historyService = {
     // Get file history
     async getFileHistory(): Promise<FileHistory[]> {
         try {
-            const { headers, userId } = getAuthData();
-            console.log('Getting file history for user:', userId);
-
-            const response = await axios.post(
+            const { headers } = getAuthData();
+            const response = await axios.get(
                 `${API_URL}/history/files`,
-                { log: userId },
                 { headers }
             );
             console.log('File history response:', response.data);
@@ -85,9 +82,8 @@ export const historyService = {
             const { headers, userId } = getAuthData();
             console.log('Getting chat history for user:', userId);
 
-            const response = await axios.post(
-                `${API_URL}/history/chats`,
-                { log: userId },
+            const response = await axios.get(
+                `${API_URL}/history/chat`,
                 { headers }
             );
             console.log('Chat history response:', response.data);
@@ -101,15 +97,12 @@ export const historyService = {
     // Delete file
     async deleteFile(fileId: string): Promise<void> {
         try {
-            const { headers, userId } = getAuthData();
+            const { headers } = getAuthData();
             console.log('Deleting file:', fileId);
 
-            await axios.post(
-                `${API_URL}/history/filed/${fileId}`,
-                {
-                   
-                    userId 
-                }
+            await axios.delete(
+                `${API_URL}/history/files/${fileId}`,
+                { headers }
             );
             console.log('File deleted successfully');
         } catch (error) {
