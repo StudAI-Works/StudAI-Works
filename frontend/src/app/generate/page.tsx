@@ -120,6 +120,7 @@ export default function GeneratePage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   // Edit prompt
   const [editText, setEditText] = useState<string>("");
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user, token, logout } = useAuth();
@@ -985,6 +986,7 @@ export default fallbackFunction;`;
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
+    const currentTimestamp = new Date();
 
     // Add user message to UI while preserving history
     setMessages(prev => [...prev, {
