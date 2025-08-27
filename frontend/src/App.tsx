@@ -17,6 +17,7 @@ import { ThemeProvider } from './components/theme-provider';
 import ProtectedRoute from './components/protectedRoute';
 import PublicRoute from './components/publicRoutes';
 import Admin from './app/account/admin';
+import { ChatWidget } from './components/chat-widget';
 function App() {
   return (
     // --- WRAP EVERYTHING IN THE THEME PROVIDER ---
@@ -48,6 +49,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      <ChatWidget/>
     </ThemeProvider>
   );
 }
