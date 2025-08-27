@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { MessageCircle, X, Send, Bot, User, Minimize2 } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+
 
 interface ChatMessage {
   id: string
@@ -37,65 +40,53 @@ export function ChatWidget() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+const handleSend = async () => {
+  if (!input.trim()) return;
 
-  const handleSend = () => {
-    if (!input.trim()) return
+  const userMessage: ChatMessage = {
+    id: Date.now().toString(),
+    type: "user",
+    content: input,
+    timestamp: new Date(),
+  };
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      type: "user",
-      content: input,
+  setMessages((prev) => [...prev, userMessage]);
+  setInput("");
+  setIsTyping(true);
+
+  try {
+    const currentUrl = window.location.href;
+    const res = await fetch("http://localhost:8080/chatbot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: input 
+        , url: currentUrl
+      }),
+    });
+
+    if (!res.ok) throw new Error("Failed to fetch");
+
+    const data = await res.json();
+
+    const botMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      type: "bot",
+      content: data.response,
       timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-    setIsTyping(true)
-
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = generateBotResponse(input)
-      const botMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: "bot",
-        content: botResponse,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, botMessage])
-      setIsTyping(false)
-    }, 1500)
+    };
+    setMessages((prev) => [...prev, botMessage]);
+  } catch (error) {
+    const errorMessage: ChatMessage = {
+      id: (Date.now() + 2).toString(),
+      type: "bot",
+      content: "Sorry, I couldn't get a response. Please try again.",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, errorMessage]);
+  } finally {
+    setIsTyping(false);
   }
-
-  const generateBotResponse = (userInput: string): string => {
-    const lowerInput = userInput.toLowerCase()
-
-    if (lowerInput.includes("help") || lowerInput.includes("support")) {
-      return "I'm here to help! You can ask me about:\n• Getting started with StudAI Builder\n• Code generation features\n• Deployment options\n• Billing and account questions\n• Technical issues\n\nWhat specific topic would you like help with?"
-    }
-
-    if (lowerInput.includes("deploy") || lowerInput.includes("deployment")) {
-      return "Great question about deployment! StudAI Builder supports one-click deployment to:\n• Vercel\n• Netlify\n• Railway\n\nJust click the Deploy button in the navbar and choose your preferred platform. Need help with a specific deployment?"
-    }
-
-    if (lowerInput.includes("code") || lowerInput.includes("generate")) {
-      return "Our AI code generation is powerful! Here's how it works:\n• Describe what you want to build in natural language\n• AI creates a blueprint with features and tech stack\n• Code is generated with live preview\n• You can iterate and refine through conversation\n\nTry the Generate page to get started!"
-    }
-
-    if (lowerInput.includes("pricing") || lowerInput.includes("cost") || lowerInput.includes("billing")) {
-      return "We offer flexible pricing:\n• Free tier with basic features\n• Pro plan at $29/month\n• Enterprise solutions available\n\nYou can view detailed pricing in your account settings. Need help with billing?"
-    }
-
-    if (lowerInput.includes("database") || lowerInput.includes("supabase") || lowerInput.includes("firebase")) {
-      return "We integrate with popular databases:\n• Supabase (PostgreSQL)\n• Firebase (NoSQL)\n• Neon (Serverless PostgreSQL)\n• Upstash (Redis)\n\nUse the Connect button in the navbar to set up your database. Which one are you interested in?"
-    }
-
-    if (lowerInput.includes("team") || lowerInput.includes("collaboration")) {
-      return "Team collaboration features include:\n• Organization management\n• Role-based access control\n• Real-time project sharing\n• Team chat and discussions\n\nCheck out the Organization page to set up your team!"
-    }
-
-    // Default response
-    return "Thanks for your question! I'm here to help with StudAI Builder. You can also:\n• Check our Help & Support page for detailed guides\n• Browse our documentation\n• Contact our support team directly\n\nIs there something specific I can help you with?"
-  }
+};
 
   if (!isOpen) {
     return (
@@ -119,7 +110,7 @@ export function ChatWidget() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center">
               <Bot className="h-4 w-4 mr-2" />
-              StudAI Builder Support
+              Nexus Support
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Button
@@ -159,8 +150,16 @@ export function ChatWidget() {
                         {message.type === "bot" && <Bot className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                         {message.type === "user" && <User className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                         <div>
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                          <p className="text-xs opacity-70 mt-1">{message.timestamp.toLocaleTimeString()}</p>
+                          {/* --- CHANGE IS HERE --- */}
+                          <div className="text-sm whitespace-pre-wrap">
+                          <ReactMarkdown  remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                          </div>
+                          {/* --- END OF CHANGE --- */}
+                          <p className="text-xs opacity-70 mt-1">
+                            {message.timestamp.toLocaleTimeString()}
+                          </p>
                         </div>
                       </div>
                     </div>

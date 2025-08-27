@@ -8,7 +8,9 @@ import { saveGeneratedOutput, listProjects, getProjectDetail, editProject, delet
 import { updateProfile, updateAvatar, getProfile } from "../controllers/profileController";
 import Allusers from "../controllers/AllUsers";
 import { protect } from "../middleware/authMiddleware";
-
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import client from "../src/lib/azureOpenAI";
+import systemPrompt  from "../route/prompt";
 const router: Router = Router();
 
 // Prefer FASTAPI_URL, else construct from HOST and PORT
@@ -180,6 +182,34 @@ router.get("/api/projects", maybeProtectProjects, listProjects);
 router.get("/api/projects/:id", maybeProtectProjects, getProjectDetail);
 router.delete("/api/projects/:id", maybeProtectProjects, deleteProject);
 router.post("/api/projects", maybeProtectProjects, createBlankProject);
+
+
+const convHistory: ChatCompletionMessageParam[] = [
+  { role: "system", content: "" },
+];
+router.post("/chatbot", async (req, res) => {
+  console.log("Chatbot request received:", req.body);
+    const { prompt,url } = req.body;
+    convHistory.push({ role: "user", content: prompt });
+try {
+  const response = await client.chat.completions.create({
+  model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
+  messages: [
+    { role: "system", content: systemPrompt+ `\n\nCurrent URL of the user is: ${url}` },
+    ...convHistory.slice(-10)
+  ],
+  temperature: 0.7,
+  max_tokens: 1000,
+});
+  console.log("OpenAI response:", response);
+  convHistory.push({ role: "assistant", content: response.choices[0].message.content || "" });
+    const botResponse = response.choices[0].message.content;
+  console.log("Bot response:", botResponse);
+    res.json({ response: botResponse });
+} catch (err) {
+  console.error("OpenAI API Error:", err);
+}
+});
 
 // Legacy route removed: use /api/start-conversation, /api/refine, and /api/generate instead.
 
