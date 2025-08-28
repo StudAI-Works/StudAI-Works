@@ -985,6 +985,7 @@ export default fallbackFunction;`;
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
+    const currentTimestamp = new Date().toISOString();
 
     // Add user message to UI while preserving history
     setMessages(prev => [...prev, {
@@ -1542,7 +1543,7 @@ export default fallbackFunction;`;
                             <>
                               <p className="whitespace-pre-wrap">{message.content}</p>
                               <div className="text-xs opacity-70 mt-2">
-                                {message.timestamp.toLocaleTimeString()}
+                                {new Date(message.timestamp).toLocaleTimeString()}
                               </div>
                             </>
                           )}
