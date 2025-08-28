@@ -88,6 +88,12 @@ router.post("/refine", handleRefine);
 // Alias with /api prefix for consistency
 router.post("/api/refine", handleRefine);
 
+router.get("/history/chat", protect, getChatHistory);
+router.post("/history/chat", protect, storeChatMessage);
+router.get("/history/files", protect, getFileHistory);
+router.post("/history/files", protect, storeGeneratedFile);
+router.delete("/history/files/:fileId", protect, deleteGeneratedFile);
+
 const REQUIRE_AUTH_GENERATE = (process.env.REQUIRE_AUTH_GENERATE || 'true').toLowerCase() !== 'false';
 const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false';
 

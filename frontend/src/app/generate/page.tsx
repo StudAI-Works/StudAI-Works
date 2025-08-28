@@ -120,6 +120,7 @@ export default function GeneratePage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   // Edit prompt
   const [editText, setEditText] = useState<string>("");
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user, token, logout } = useAuth();
