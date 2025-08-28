@@ -49,7 +49,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
-      <ChatWidget/>
+      {/* <ChatWidget/> */}
     </ThemeProvider>
   );
 }

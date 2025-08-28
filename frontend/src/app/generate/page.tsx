@@ -1,7 +1,7 @@
 // file: src/pages/GeneratePage.tsx
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +17,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackPreview } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 
@@ -39,6 +39,51 @@ interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
+const ErrorListener = ({
+  onFix, // onFix is passed but unused in this specific logic
+  onErrorChange,
+}: {
+  onFix: (errorMessage: string) => void;
+  onErrorChange: (hasError: boolean, errorMessage: string | null) => void;
+}) => {
+  const { sandpack } = useSandpack();
+  const clientId = Object.keys(sandpack.clients)[0];
+  const { logs } = useSandpackConsole({
+    clientId,
+    resetOnPreviewRestart: true,
+  });
+
+  // This ref acts as a flag to break the re-render cycle.
+  const errorPropagationFlag = useRef(false);
+
+  useEffect(() => {
+    const errorMessages = logs
+      .filter((log) => log.method === "error" && Array.isArray(log.data) && log.data.length > 0)
+      .flatMap((log) => log.data.map(e => (e instanceof Error ? e.message : String(e))));
+
+    const foundError = errorMessages.length > 0;
+
+    if (foundError) {
+      // 1. An error was found. Set the flag to true BEFORE you "shout".
+      errorPropagationFlag.current = true;
+      const combinedMessage = errorMessages.join("\n");
+      onErrorChange(true, combinedMessage);
+    } else {
+      // 2. No error was found. Check if we are expecting an "echo".
+      if (errorPropagationFlag.current) {
+        // 3. The flag is true, so this is the echo.
+        // Reset the flag to false and, crucially, DO NOTHING ELSE.
+        errorPropagationFlag.current = false;
+      } else {
+        // 4. The flag is false, so this is a genuine "clear" event.
+        // Propagate the change as normal.
+        onErrorChange(false, null);
+      }
+    }
+  }, [logs, onErrorChange]); // Depends on the STABLE onErrorChange from useCallback
+
+  return null;
+};
 // Constant Arrays
 const quickActions = [
   { icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" },
@@ -121,6 +166,13 @@ export default function GeneratePage() {
 
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
+const [hasError, setHasError] = useState(false);
+const [lastError, setLastError] = useState<string>("");
+
+const handleErrorChange = useCallback((hasError: boolean, errorMessage: string | null) => {
+  setHasError(hasError);
+  setLastError(errorMessage || "");
+}, [hasError, lastError]);
 
   // Allow overriding backend URL via Vite env, fallback to localhost
   const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
@@ -1539,14 +1591,28 @@ export default fallbackFunction;`;
                         }
                       }}
                     />
-                    <Button
-                      size="icon"
-                      className="absolute bottom-3 right-3"
-                      onClick={() => handleSend()}
-                      disabled={!input.trim() || isGenerating}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
+                    <div className="absolute bottom-3 right-3 flex flex-row gap-2">
+            <Button
+  variant="secondary"
+  onClick={() => {
+    if (lastError.trim()) {
+      handleSend(`Refine the code to fix the following error:\n${lastError}`);
+    }
+  }}
+  disabled={!hasError || isGenerating}
+  size="sm"
+>
+  <Bug className="h-4 w-4 mr-1" /> {hasError ? 'Fix Last Error' : 'No Errors'}
+</Button>
+            <Button
+              size="icon"
+              onClick={() => handleSend()}
+              disabled={!input.trim() || isGenerating}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+
                   </div>
                 </div>
               </div>
@@ -1629,6 +1695,9 @@ export default fallbackFunction;`;
                           }
                         }}
                       >
+                               <ErrorListener onErrorChange={handleErrorChange} onFix={function (errorMessage: string): void {
+                            throw new Error("Function not implemented.");
+                          } } />
                         <SandpackLayout style={{ height: "100%", minHeight: 0 }} className="flex-1 min-h-0">
                           <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} />
                           <SandpackPreview style={{ height: "calc(100vh - 240px)" }} />
