@@ -184,6 +184,13 @@ router.post("/api/projects/:id/edit", maybeProtectProjects, editProject);
 router.get("/api/projects", maybeProtectProjects, listProjects);
 router.get("/api/projects/:id", maybeProtectProjects, getProjectDetail);
 
+// History routes
+router.post("/history/file", protect, storeGeneratedFile);
+router.post("/history/chat", protect, storeChatMessage);
+router.get("/history/files", protect, getFileHistory);
+router.get("/history/chat", protect, getChatHistory);
+router.delete("/history/files/:id", protect, deleteGeneratedFile);
+
 // Legacy route removed: use /api/start-conversation, /refine, and /api/generate instead.
 
 export default router;
