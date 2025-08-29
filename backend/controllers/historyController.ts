@@ -8,7 +8,7 @@ import { AuthenticatedRequest } from "../middleware/authMiddleware";
  * @route   POST /api/history/file
  */
 export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.body.log;
+    const userId = req.user?.id;
     console.log("User ID:", userId);
     console.log("Request body:", req.body);
 
@@ -110,7 +110,7 @@ export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, r
  * @route   POST /api/history/chat
  */
 export const storeChatMessage = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.body.log;
+    const userId = req.user?.id;
     console.log("User ID from token:", userId);
 
     if (!userId) {
@@ -154,7 +154,7 @@ export const storeChatMessage = ApiHandler(async (req: AuthenticatedRequest, res
  * @route   GET /api/history/files
  */
 export const getFileHistory = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.body.log;
+    const userId = req.user?.id;
     console.log("Getting file history for user:", userId);
 
     if (!userId) {

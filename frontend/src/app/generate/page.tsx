@@ -901,7 +901,10 @@ export default fallbackFunction;`;
       const content = match[3].trim();
       if (path && content) {
         const fixedPath = fixPath(path);
-        files.push({ path: fixedPath, content });
+        // Only add files with valid extensions and content that doesn't look like markdown
+        if (fixedPath.includes('.') && !content.includes('## 🔹')) {
+          files.push({ path: fixedPath, content });
+        }
       }
     }
 
@@ -912,8 +915,11 @@ export default fallbackFunction;`;
       const lines = section.split('\n');
       const title = lines[0].replace('## 🔹 ', '').trim();
       const content = lines.slice(1).join('\n').trim();
+      
+      // Only save markdown sections as .md files, not as code files
       if (title !== 'Code Files' && content) {
-        files.push({ path: `${title.toLowerCase().replace(/\s+/g, '-')}.md`, content });
+        const mdFilename = `${title.toLowerCase().replace(/\s+/g, '-')}.md`;
+        files.push({ path: mdFilename, content });
       }
     });
 
@@ -970,7 +976,7 @@ export default fallbackFunction;`;
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.message, timestamp: new Date() }]);
 
       // Store initial message in history
-      await storeChatMessage(data.message, 'assistant');
+      // await storeChatMessage(data.message, 'assistant');
 
       toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
       return data.session_id;
@@ -978,7 +984,7 @@ export default fallbackFunction;`;
       const errorMessage = `Error: ${err.message}`;
 
       // Store error message in history
-      await storeChatMessage(errorMessage, 'error');
+      // await storeChatMessage(errorMessage, 'error');
 
       toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
     }
@@ -998,7 +1004,7 @@ export default fallbackFunction;`;
     setInput("");
 
     // Store user message in history
-    await storeChatMessage(messageContent, 'user');
+    // await storeChatMessage(messageContent, 'user');
 
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
@@ -1040,7 +1046,7 @@ export default fallbackFunction;`;
       }]);
 
       // Store assistant message in history
-      await storeChatMessage(data.reply, 'assistant');
+      // await storeChatMessage(data.reply, 'assistant');
 
       toast.update(loadingToastId, { render: "Response received!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
@@ -1048,7 +1054,7 @@ export default fallbackFunction;`;
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: errorMessage, timestamp: new Date() }]);
 
       // Store error message in history
-      await storeChatMessage(errorMessage, 'error');
+      // await storeChatMessage(errorMessage, 'error');
 
       toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
     }
@@ -1113,7 +1119,7 @@ export default fallbackFunction;`;
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: errorMessage, timestamp: new Date() }]);
 
       // Store error message in history
-      await storeChatMessage(errorMessage, 'error');
+      // await storeChatMessage(errorMessage, 'error');
 
       toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
     } finally {
@@ -1311,13 +1317,64 @@ export default fallbackFunction;`;
   };
 
   // Helper function to store chat messages in history
-  const storeChatMessage = async (content: string, role: 'user' | 'assistant' | 'error') => {
-    try {
-      await historyService.storeChatMessage(content, role);
-    } catch (error) {
-      console.error('Failed to store chat message:', error);
-      // Don't show toast here as it would be too noisy
-    }
+  // const storeChatMessage = async (content: string, role: 'user' | 'assistant' | 'error') => {
+  //   try {
+  //     await historyService.storeChatMessage(content, role);
+  //   } catch (error) {
+  //     console.error('Failed to store chat message:', error);
+  //     // Don't show toast here as it would be too noisy
+  //   }
+  // };
+
+  // Helper function to get MIME type based on file extension
+  const getFileType = (filePath: string): string => {
+    const extension = filePath.split('.').pop()?.toLowerCase();
+    
+    const mimeTypes: Record<string, string> = {
+      // Web files
+      'html': 'text/html',
+      'htm': 'text/html',
+      'css': 'text/css',
+      'js': 'application/javascript',
+      'jsx': 'application/javascript',
+      'ts': 'application/typescript',
+      'tsx': 'application/typescript',
+      'json': 'application/json',
+      'xml': 'application/xml',
+      
+      // Text files
+      'txt': 'text/plain',
+      'md': 'text/markdown',
+      'markdown': 'text/markdown',
+      'yml': 'text/yaml',
+      'yaml': 'text/yaml',
+      
+      // Configuration files
+      'config': 'text/plain',
+      'conf': 'text/plain',
+      'env': 'text/plain',
+      'gitignore': 'text/plain',
+      'dockerfile': 'text/plain',
+      
+      // Programming languages
+      'py': 'text/x-python',
+      'java': 'text/x-java-source',
+      'cpp': 'text/x-c++src',
+      'c': 'text/x-csrc',
+      'php': 'application/x-httpd-php',
+      'rb': 'text/x-ruby',
+      'go': 'text/x-go',
+      'rs': 'text/x-rust',
+      'sh': 'application/x-sh',
+      'bat': 'application/x-bat',
+      'ps1': 'application/x-powershell',
+      
+      // Package files
+      'lock': 'text/plain',
+      'package': 'application/json',
+    };
+    
+    return mimeTypes[extension || ''] || 'text/plain';
   };
 
   // Helper function to store generated file in history

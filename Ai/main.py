@@ -18,14 +18,22 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Azure envs (do not fail-fast; allow non-Azure endpoints like /start-conversation)
-REQUIRED_ENV = [
+AZURE_REQUIRED_ENV = [
     "AZURE_OPENAI_KEY",
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_OPENAI_API_VERSION",
     "AZURE_OPENAI_DEPLOYMENT_NAME",
 ]
-_missing = [k for k in REQUIRED_ENV if not os.getenv(k)]
-AZURE_READY = len(_missing) == 0
+
+# Regular OpenAI env (fallback option)
+OPENAI_REQUIRED_ENV = ["OPENAI_API_KEY"]
+
+_azure_missing = [k for k in AZURE_REQUIRED_ENV if not os.getenv(k)]
+_openai_missing = [k for k in OPENAI_REQUIRED_ENV if not os.getenv(k)]
+
+AZURE_READY = len(_azure_missing) == 0
+OPENAI_READY = len(_openai_missing) == 0
+AI_READY = AZURE_READY or OPENAI_READY
 
 app = FastAPI(
     title="StudAI Works - Conversational AI Coder",
@@ -58,21 +66,42 @@ app.add_middleware(
 
 # --- AI Client Setup ---
 client = None
+openai_client = None
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4")
+
 if AZURE_READY:
+    from openai import AsyncAzureOpenAI
     client = AsyncAzureOpenAI(
         api_key=os.getenv("AZURE_OPENAI_KEY"),
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
         api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
     )
     logger.info(
-        "AI service initialized: model=%s, origins=%s, credentials=%s",
+        "Azure OpenAI initialized: model=%s, origins=%s, credentials=%s",
         AZURE_OPENAI_DEPLOYMENT_NAME,
         allowed_origins,
         allow_credentials,
     )
+elif OPENAI_READY:
+    from openai import AsyncOpenAI
+    openai_client = AsyncOpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
+    logger.info(
+        "Regular OpenAI initialized: model=%s, origins=%s, credentials=%s",
+        OPENAI_MODEL,
+        allowed_origins,
+        allow_credentials,
+    )
 else:
-    logger.warning("Azure OpenAI env not fully configured (%s missing). /start-conversation will work; /refine and /generate will return 503 until configured.", ", ".join(_missing))
+    missing_envs = []
+    if not AZURE_READY:
+        missing_envs.extend([f"Azure: {', '.join(_azure_missing)}"])
+    if not OPENAI_READY:
+        missing_envs.extend([f"OpenAI: {', '.join(_openai_missing)}"])
+    
+    logger.warning("No AI service configured. Missing: %s. /start-conversation will work; /refine and /generate will return 503 until configured.", " OR ".join(missing_envs))
 
 # --- In-Memory Session Storage ---
 CONVERSATION_SESSIONS = {}
@@ -197,14 +226,25 @@ async def refine_features(request: ConversationRequest):
     history.append({"role": "user", "content": request.message})
 
     try:
-        if not AZURE_READY or client is None:
-            raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
-        response = await client.chat.completions.create(
-            model=AZURE_OPENAI_DEPLOYMENT_NAME,
-            messages=history,
-            temperature=0.7,
-            max_tokens=2000,
-        )
+        if not AI_READY or (client is None and openai_client is None):
+            raise HTTPException(status_code=503, detail="AI service is not configured. Please set AZURE_OPENAI_* or OPENAI_API_KEY env vars.")
+        
+        # Use Azure OpenAI if available, otherwise use regular OpenAI
+        if client is not None:
+            response = await client.chat.completions.create(
+                model=AZURE_OPENAI_DEPLOYMENT_NAME,
+                messages=history,
+                temperature=0.7,
+                max_tokens=2000,
+            )
+        else:
+            response = await openai_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=history,
+                temperature=0.7,
+                max_tokens=2000,
+            )
+        
         reply = response.choices[0].message.content
         history.append({"role": "assistant", "content": reply})
         CONVERSATION_SESSIONS[request.session_id] = history
@@ -239,17 +279,27 @@ async def run_code_generation(request: GenerateRequest) -> str:
 
     full_output = ""
     try:
-        if not AZURE_READY or client is None:
-            raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
+        if not AI_READY or (client is None and openai_client is None):
+            raise HTTPException(status_code=503, detail="AI service is not configured. Please set AZURE_OPENAI_* or OPENAI_API_KEY env vars.")
+        
         for section_title, section_task in CODE_GEN_PLAN.items():
             messages.append({"role": "user", "content": section_task})
 
-            response = await client.chat.completions.create(
-                model=AZURE_OPENAI_DEPLOYMENT_NAME,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=10192,
-            )
+            # Use Azure OpenAI if available, otherwise use regular OpenAI
+            if client is not None:
+                response = await client.chat.completions.create(
+                    model=AZURE_OPENAI_DEPLOYMENT_NAME,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=4000,
+                )
+            else:
+                response = await openai_client.chat.completions.create(
+                    model=OPENAI_MODEL,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=4000,
+                )
 
             section_response = response.choices[0].message.content
             messages.append({"role": "assistant", "content": section_response})

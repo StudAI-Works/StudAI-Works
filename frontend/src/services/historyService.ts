@@ -20,7 +20,7 @@ export const historyService = {
     // Store generated file
     async storeFile(fileContent: string, fileName: string, fileType: string): Promise<{ fileUrl: string }> {
         try {
-            const { headers, userId } = getAuthData();
+            const { headers } = getAuthData();
             console.log('Storing file:', { fileName, fileType, contentLength: fileContent.length });
 
             const response = await axios.post(
@@ -28,8 +28,7 @@ export const historyService = {
                 {
                     fileContent,
                     fileName,
-                    fileType,
-                    log: userId
+                    fileType
                 },
                 { headers }
             );
@@ -44,13 +43,12 @@ export const historyService = {
     // Store chat message
     async storeChatMessage(message: string, role: 'user' | 'assistant'): Promise<void> {
         try {
-            const { headers, userId } = getAuthData();
+            const { headers } = getAuthData();
             await axios.post(
                 `${API_URL}/history/chat`,
                 {
                     message,
-                    role,
-                    log: userId
+                    role
                 },
                 { headers }
             );
