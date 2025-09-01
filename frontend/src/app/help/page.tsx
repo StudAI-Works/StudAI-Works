@@ -17,15 +17,15 @@ import {
   Search,
   MessageCircle,
   Book,
-  Video,
+  // Video,
   Mail,
   Phone,
   Clock,
   CheckCircle,
   HelpCircle,
-  FileText,
-  Zap,
-  Code,
+  // FileText,
+  // Zap,
+  // Code,
   AlertCircle,
   TrendingUp,
 } from "lucide-react"
@@ -232,24 +232,24 @@ const systemStatus = {
 
 export default function HelpPage() {
   const [searchQuery, setSearchQuery] = useState("");
-const [selectedCategory, setSelectedCategory] = useState("all");
-const [ticketForm, setTicketForm] = useState({
-  subject: "",
-  category: "general",
-  priority: "medium",
-  description: "",
-});
-const { user, logout } = useAuth();
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [ticketForm, setTicketForm] = useState({
+    subject: "",
+    category: "general",
+    priority: "medium",
+    description: "",
+  });
+  const { user, logout } = useAuth();
 
-if (!user) {
-  return <Navigate to="/auth" replace />;
-}
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
-const headerUser = {
-  name: user.fullName,
-  email: user.email,
-  avatar: "/placeholder.svg?height=32&width=32",
-};
+  const headerUser = {
+    name: user.fullName,
+    email: user.email,
+    avatar: "/placeholder.svg?height=32&width=32",
+  };
 
   // Knowledge Base Search
   const filteredKnowledge = knowledgeBase.filter((item) => {

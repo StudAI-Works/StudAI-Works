@@ -18,7 +18,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
@@ -120,7 +120,7 @@ export default function GeneratePage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   // Edit prompt
   const [editText, setEditText] = useState<string>("");
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  // const [isLoadingHistory, setIsLoadingHistory] = useState(true); // Commented out - unused
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user, token, logout } = useAuth();
@@ -915,7 +915,7 @@ export default fallbackFunction;`;
       const lines = section.split('\n');
       const title = lines[0].replace('## 🔹 ', '').trim();
       const content = lines.slice(1).join('\n').trim();
-      
+
       // Only save markdown sections as .md files, not as code files
       if (title !== 'Code Files' && content) {
         const mdFilename = `${title.toLowerCase().replace(/\s+/g, '-')}.md`;
@@ -992,7 +992,7 @@ export default fallbackFunction;`;
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
-    const currentTimestamp = new Date().toISOString();
+    const currentTimestamp = new Date();
 
     // Add user message to UI while preserving history
     setMessages(prev => [...prev, {
@@ -1329,7 +1329,7 @@ export default fallbackFunction;`;
   // Helper function to get MIME type based on file extension
   const getFileType = (filePath: string): string => {
     const extension = filePath.split('.').pop()?.toLowerCase();
-    
+
     const mimeTypes: Record<string, string> = {
       // Web files
       'html': 'text/html',
@@ -1341,21 +1341,21 @@ export default fallbackFunction;`;
       'tsx': 'application/typescript',
       'json': 'application/json',
       'xml': 'application/xml',
-      
+
       // Text files
       'txt': 'text/plain',
       'md': 'text/markdown',
       'markdown': 'text/markdown',
       'yml': 'text/yaml',
       'yaml': 'text/yaml',
-      
+
       // Configuration files
       'config': 'text/plain',
       'conf': 'text/plain',
       'env': 'text/plain',
       'gitignore': 'text/plain',
       'dockerfile': 'text/plain',
-      
+
       // Programming languages
       'py': 'text/x-python',
       'java': 'text/x-java-source',
@@ -1368,12 +1368,12 @@ export default fallbackFunction;`;
       'sh': 'application/x-sh',
       'bat': 'application/x-bat',
       'ps1': 'application/x-powershell',
-      
+
       // Package files
       'lock': 'text/plain',
       'package': 'application/json',
     };
-    
+
     return mimeTypes[extension || ''] || 'text/plain';
   };
 
@@ -1390,7 +1390,7 @@ export default fallbackFunction;`;
   // Load chat history when component mounts
   useEffect(() => {
     const loadChatHistory = async () => {
-      setIsLoadingHistory(true);
+      // setIsLoadingHistory(true); // Commented out since variable is unused
       try {
         const history = await historyService.getChatHistory();
 
@@ -1410,7 +1410,7 @@ export default fallbackFunction;`;
         console.error('Failed to load chat history:', error);
         toast.error('Failed to load chat history');
       } finally {
-        setIsLoadingHistory(false);
+        // setIsLoadingHistory(false); // Commented out since variable is unused
       }
     };
 
