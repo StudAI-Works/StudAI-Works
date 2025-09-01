@@ -11,6 +11,9 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from openai import AsyncAzureOpenAI, RateLimitError
 from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
+import re
+import dataclasses
+from typing import List, Dict
 
 # --- Setup & Configuration ---
 load_dotenv()
@@ -167,6 +170,19 @@ CODE_GEN_PLAN = {
     "Validate Project": "Finally, double-check that the project is complete and functional. Ensure all important files exist (vite.config.ts, index.html(including the initialisation of tsx in it if necessary), package.json(recheck if all imports are included), tailwind.config.js in frontend; server.ts or main.py and requirements.txt in backend). Check that the README covers everything necessary to run the project. Then confirm that this app should build and run end-to-end without errors. Respond with your validation checklist and a final confirmation message."
 }
 
+@dataclasses.dataclass
+class File:
+    path: str
+    content: str
+
+@dataclasses.dataclass
+class EditRequest:
+    files: List[File]
+    instructions: str = ""
+    error: str = ""
+    file_paths: List[str] = dataclasses.field(default_factory=list)
+
+
 # --- API Endpoints ---
 @app.get("/")
 async def root():
@@ -279,22 +295,170 @@ async def generate_code(request: GenerateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Edit/Improve existing code ---
+# @app.post("/edit")
+# async def edit_code(req: EditRequest):
+#     try:
+#         if not AZURE_READY or client is None:
+#             raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
+
+#         # Build prompt: provide instruction/error and current files; ask for only modified files in strict format
+#         SYSTEM_PROMPT = (
+#             "You are an expert software engineer and code editor. Given the user's instructions or a concrete error, "
+#             "produce only the updated files needed to implement the change or fix the error. Output strictly as markdown blocks, "
+#             "one per changed file, using this exact format: \n\n"
+#             "#### path/to/file.ext\n\n```language\n<full file content>\n```\n\n"
+#             "Do not include explanations or any other text. If no changes are needed, return an empty response."
+#         )
+
+#         # Prepare a compact files listing. If too many files, this may be large; MVP keeps it simple.
+#         files_text_parts = []
+#         for f in req.files:
+#             # Heuristic language from extension
+#             lang = ""
+#             if f.path.endswith((".ts", ".tsx")):
+#                 lang = "ts"
+#             elif f.path.endswith((".js", ".jsx")):
+#                 lang = "js"
+#             elif f.path.endswith(".css"):
+#                 lang = "css"
+#             elif f.path.endswith(".json"):
+#                 lang = "json"
+#             elif f.path.endswith(".md"):
+#                 lang = "md"
+#             files_text_parts.append(f"#### {f.path}\n\n```{lang}\n{f.content}\n```")
+
+#         files_context = "\n\n---\n".join(files_text_parts)
+
+#         # Lightweight context of full project paths if provided
+#         index_section = ("\n\nProject file index (paths only):\n" + "\n".join(req.file_paths)) if req.file_paths else ""
+
+#         user_msg = (
+#             (f"Instructions:\n{req.instructions}\n\n" if req.instructions else "") +
+#             (f"Error:\n{req.error}\n\n" if req.error else "") +
+#             "Here are the current relevant files. Apply the change/fix and output only the changed files as strict markdown blocks.\n\n"
+#             + files_context + index_section
+#         )
+
+#         messages = [
+#             {"role": "system", "content": SYSTEM_PROMPT},
+#             {"role": "user", "content": user_msg}
+#         ]
+
+#         resp = await client.chat.completions.create(
+#             model=AZURE_OPENAI_DEPLOYMENT_NAME,
+#             messages=messages,
+#             temperature=0.2,
+#             max_tokens=4096,
+#         )
+#         content = resp.choices[0].message.content or ""
+#         return Response(content=content, media_type='text/markdown')
+#     except Exception as e:
+#         logger.error(f"Error during edit: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
+
+def apply_unified_diff(original_files: Dict[str, str], parsed_diffs) -> Dict[str, str]:
+    """
+    Processes AI diff markdown and applies the patch to the provided original files.
+    This function handles the unified diff format.
+
+    :param original_files: dict of {file_path: file_content}
+    :param ai_diff_markdown: markdown as string containing diff patches
+    :return: dict of {file_path: new_content} with patched content
+    """
+    print("Parsed diffs:", parsed_diffs)
+    if not parsed_diffs:
+        raise ValueError("No diffs found in markdown")
+    patched_files = original_files.copy()
+    for path, patch_text in parsed_diffs:
+        path = path.strip()
+        if path not in patched_files:
+            raise ValueError(f"No original content for file: {path}")
+
+        original_lines = patched_files[path].splitlines(keepends=True)
+        patched_lines = list(original_lines)
+        offset = 0
+
+        # Regex to parse the unified diff hunk header
+        hunk_header_re = re.compile(r"@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@")
+        hunks = re.split(r"(@@ -.*)", patch_text)
+        
+        # Skip the first empty element from split
+        hunks = hunks[1:]
+
+        for i in range(0, len(hunks), 2):
+            header = hunks[i]
+            body = hunks[i+1]
+            match = hunk_header_re.match(header)
+            if not match:
+                raise ValueError("Malformed hunk header in patch")
+            
+            # Extract line numbers and lengths
+            original_start = int(match.group(1)) - 1
+            original_len_str = match.group(2)
+            original_len = int(original_len_str) if original_len_str else 1
+            
+            # Extract hunk lines
+            body_lines = body.splitlines(keepends=True)
+
+            # Manually apply changes
+            # We don't need to check context lines as the patch is a direct replacement
+            del patched_lines[original_start + offset : original_start + offset + original_len]
+            
+            new_lines = []
+            for line in body_lines:
+                if line.startswith('+'):
+                    new_lines.append(line[1:])
+                elif line.startswith('-'):
+                    continue  # Removed line; already handled by deletion
+                else:
+                    new_lines.append(line)  # Context line
+
+            patched_lines[original_start + offset:original_start + offset] = new_lines
+            offset += len(new_lines) - original_len
+
+        patched_files[path] = ''.join(patched_lines)
+    print("Patched file:", patched_files[path])  
+    return patched_files
+
 @app.post("/edit")
 async def edit_code(req: EditRequest):
     try:
         if not AZURE_READY or client is None:
             raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
 
-        # Build prompt: provide instruction/error and current files; ask for only modified files in strict format
         SYSTEM_PROMPT = (
-            "You are an expert software engineer and code editor. Given the user's instructions or a concrete error, "
-            "produce only the updated files needed to implement the change or fix the error. Output strictly as markdown blocks, "
-            "one per changed file, using this exact format: \n\n"
-            "#### path/to/file.ext\n\n```language\n<full file content>\n```\n\n"
-            "Do not include explanations or any other text. If no changes are needed, return an empty response."
+                    "You are an expert software engineer and code editor. Given the user's instructions or a concrete error, "
+        "produce only the updated files needed to implement the change or fix the error. Output strictly as markdown blocks, "
+        "one per changed file, using this exact format: \n\n"
+        "#### path/to/file.ext\n\n```patch\n<unified diff content>\n```\n\n"
+        "e.g.,"
+        "backend/server.js"
+        """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+            <title>APP</title>
+            <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+            </head>
+            if i want to change the title to Myapp
+            then you will output will be 
+            #### backend/server.js
+            ```patch
+            @@ -6,1 +6,1 @@
+            - <title>APP</title>
+            + <title>Myapp</title>
+            ``` 
+        """
+        "Here 6 means line number 6 and 1 means one line is changed and - means removed line and + means added line. STRICTLY FOLLOW THIS"
+        "The unified diff hunk header must exactly use the line number of the first changed line and the exact number of changed lines in original and new files. Do not include extra context lines. For example, if only line 3 is changed, use @@ -3,1 +3,1 @@, NOT @@ -3,7 +3,6 @@."
+        "Strictly follow this format. Only include lines that changed, prefixed with + or - as in unified diff format. "
+        "USE THE EXACT LINE NUMBERS FROM THE ORIGINAL FILE IN THE DIFF HEADER AND THE NUMBER OF LINES MODIFIED. "
+        "Include only the changed part in the diff, not the full file to keep the diff minimal but correct "
+        "Do not include explanations or any other text. If no changes are needed, return an empty response."
         )
 
-        # Prepare a compact files listing. If too many files, this may be large; MVP keeps it simple.
         files_text_parts = []
         for f in req.files:
             # Heuristic language from extension
@@ -335,8 +499,42 @@ async def edit_code(req: EditRequest):
             max_tokens=4096,
         )
         content = resp.choices[0].message.content or ""
-        return Response(content=content, media_type='text/markdown')
+        print("AI response content:", content)
+        # Extract diff blocks by file
+        parsed_diffs = re.findall(r"#### (.*?)\n```patch\n(.*?)\n```", content, re.DOTALL)
+        print("Parsed diffs:", parsed_diffs)
+        if not parsed_diffs:
+            # No changes sent by LLM
+            return Response(content="", media_type="text/markdown")
+
+        original_files_map = {f.path: f.content for f in req.files}
+        print("Original files map:", original_files_map.keys())
+        # Apply all diffs to original files
+        full_updated_files = {}
+        full_updated_files=apply_unified_diff(original_files_map, parsed_diffs)
+        print("Full updated files:", full_updated_files["frontend/src/components/Dashboard.tsx"])
+        response_blocks = []
+        for path, content_text in full_updated_files.items():
+            lang = ""
+            if path.endswith((".ts", ".tsx")):
+                lang = "ts"
+            elif path.endswith((".js", ".jsx")):
+                lang = "js"
+            elif path.endswith(".css"):
+                lang = "css"
+            elif path.endswith(".json"):
+                lang = "json"
+            elif path.endswith(".md"):
+                lang = "md"
+
+            block = f"#### {path}\n\n```{lang}\n{content_text}\n```"
+            response_blocks.append(block)
+        
+        final_content = "\n\n".join(response_blocks)
+        return Response(content=final_content, media_type="text/markdown")
+
     except Exception as e:
+        # Log and return error
         logger.error(f"Error during edit: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
