@@ -159,6 +159,7 @@ export default function GeneratePage() {
   // Track saved project id to create new versions on subsequent saves
   const [projectId, setProjectId] = useState<string | null>(null);
   // Edit prompt
+  const [sandpackKey, setSandpackKey] = useState(Date.now());
   const [editText, setEditText] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   type Phase = 'refine' | 'generated'
@@ -886,6 +887,7 @@ export default fallbackFunction;`;
         if (artifacts.length > 0) {
           const files = artifacts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
           setGeneratedFiles(files);
+          setSandpackKey(Date.now())
           const tree = buildFileTree(files);
           setFileTree(tree);
           setSelectedFile(files[0]);
@@ -1097,10 +1099,12 @@ export default fallbackFunction;`;
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      console.log('Edit response', data);
       const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
       if (arts.length > 0) {
         const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
         setGeneratedFiles(files);
+        setSandpackKey(Date.now());
         setFileTree(buildFileTree(files));
         setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
         setFullMarkdown(filesToMarkdown(files));
@@ -1243,83 +1247,6 @@ export default fallbackFunction;`;
       toast.update(loadingToastId, { render: `Saved! Project ${data.project_id}, v${data.version}`, type: "success", isLoading: false, autoClose: 3000 });
     } catch (err: any) {
       toast.update(loadingToastId, { render: `Save failed: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
-    }
-  };
-
-  const handleApplyEdit = async () => {
-    if (!projectId) {
-      toast.error("Save the project first to enable edits");
-      return;
-    }
-    if (!token) {
-      toast.error("Please sign in");
-      return;
-    }
-    if (!editText.trim()) {
-      toast.error("Enter what you want to change");
-      return;
-    }
-    const tId = toast.loading("Applying edit...");
-    try {
-      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ instructions: editText })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
-      if (arts.length > 0) {
-        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
-        setGeneratedFiles(files);
-        setFileTree(buildFileTree(files));
-        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
-        setFullMarkdown(filesToMarkdown(files));
-      }
-      toast.update(tId, { render: `Edit applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
-    } catch (e: any) {
-      toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
-    }
-  };
-
-  const handleFixError = async () => {
-    if (!projectId) {
-      toast.error("Save the project first to enable fixes");
-      return;
-    }
-    if (!token) {
-      toast.error("Please sign in");
-      return;
-    }
-    // Try latest error from chat messages; fallback to prompt()
-    const lastErrMsg = [...messages].reverse().find(m => m.type === 'error')?.content;
-    let errorText = lastErrMsg || '';
-    if (!errorText) {
-      // eslint-disable-next-line no-alert
-      const manual = window.prompt('Paste the error message to fix:');
-      if (!manual) return;
-      errorText = manual;
-    }
-    const tId = toast.loading("Fixing error...");
-    try {
-      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ error: errorText })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
-      if (arts.length > 0) {
-        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
-        setGeneratedFiles(files);
-        setFileTree(buildFileTree(files));
-        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
-        setFullMarkdown(filesToMarkdown(files));
-      }
-      toast.update(tId, { render: `Fix applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
-    } catch (e: any) {
-      toast.update(tId, { render: `Fix failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
     }
   };
 
@@ -1537,22 +1464,6 @@ export default fallbackFunction;`;
                   >
                     Save Project
                   </Button>
-                  <div className="mt-3 space-y-2">
-                    <Textarea
-                      placeholder="Describe an edit (e.g., make shadows darker and background midnight blue)"
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      className="min-h-[64px]"
-                    />
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" onClick={handleApplyEdit} disabled={!projectId}>
-                        <Wand2 className="h-4 w-4 mr-1" /> Apply Edit
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={handleFixError} disabled={!projectId}>
-                        <Bug className="h-4 w-4 mr-1" /> Fix Error
-                      </Button>
-                    </div>
-                  </div>
                 </div>
                 <ScrollArea className="flex-1">
                   <div className="p-4 space-y-6">
@@ -1583,7 +1494,7 @@ export default fallbackFunction;`;
                       placeholder="Describe what to build or modify..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      className="min-h-[60px] resize-none pr-12"
+                       className={`min-h-[60px] resize-none ${(!hasError || isGenerating) ? 'pr-12' : 'pr-36'}`}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -1594,15 +1505,15 @@ export default fallbackFunction;`;
                     <div className="absolute bottom-3 right-3 flex flex-row gap-2">
             <Button
   variant="secondary"
-  onClick={() => {
+  onClick={async () => {
     if (lastError.trim()) {
-      handleSend(`Refine the code to fix the following error:\n${lastError}`);
+      await applyEditFromChat(`Refine the code to fix the following error:\n${lastError}`);
     }
   }}
-  disabled={!hasError || isGenerating}
+  className={hasError && !isGenerating ? "inline-flex" : "hidden"}
   size="sm"
 >
-  <Bug className="h-4 w-4 mr-1" /> {hasError ? 'Fix Last Error' : 'No Errors'}
+  <Bug className="h-4 w-4 mr-1" /> {hasError ? 'Fix Error' : 'No Errors'}
 </Button>
             <Button
               size="icon"
@@ -1679,6 +1590,7 @@ export default fallbackFunction;`;
                   <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
                     {selectedTab === 'preview' && (
                       <SandpackProvider
+                       key={sandpackKey} 
                         files={sandpackConfig.files}
                         template="react-ts"
                         customSetup={{
