@@ -1,6 +1,7 @@
 "use client"
 
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect } from 'react';
+import type { ReactNode } from 'react';
 
 // --- NEW: Define the shape of the user and the session we will store ---
 interface User {
@@ -17,7 +18,7 @@ interface Session {
 // --- UPDATE: Add getToken to the context type ---
 interface AuthContextType {
   user: User | null;
-    token: string | null; // Keep track of the token
+  token: string | null; // Keep track of the token
   login: (sessionData: Session) => void;
   logout: () => void;
   isAuthenticated: boolean;
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(null);
     // --- UPDATE: Clear the session, not just the user ---
     localStorage.removeItem('StudAI-Builder');
-    window.location.href = '/'; 
+    window.location.href = '/';
   };
 
   const isAuthenticated = !!user;

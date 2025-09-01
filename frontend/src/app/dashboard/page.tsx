@@ -11,7 +11,7 @@ import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder, Refres
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/dashboard-sidebar";
 import { useAuth } from "../context/authContext";
-import { HistoryPanel } from "@/components/HistoryPanel";
+// import { HistoryPanel } from "@/components/HistoryPanel";
 
 type ProjectItem = {
   id: string;
