@@ -1,7 +1,7 @@
 // file: src/pages/GeneratePage.tsx
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo ,useCallback} from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackPreview } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole  } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
@@ -43,6 +43,52 @@ interface FileTreeNode {
   type: "file" | "folder";
   children?: FileTreeNode[];
 }
+
+const ErrorListener = ({
+  onFix, // onFix is passed but unused in this specific logic
+  onErrorChange,
+}: {
+  onFix: (errorMessage: string) => void;
+  onErrorChange: (hasError: boolean, errorMessage: string | null) => void;
+}) => {
+  const { sandpack } = useSandpack();
+  const clientId = Object.keys(sandpack.clients)[0];
+  const { logs } = useSandpackConsole({
+    clientId,
+    resetOnPreviewRestart: true,
+  });
+
+  // This ref acts as a flag to break the re-render cycle.
+  const errorPropagationFlag = useRef(false);
+
+  useEffect(() => {
+    const errorMessages = logs
+      .filter((log) => log.method === "error" && Array.isArray(log.data) && log.data.length > 0)
+      .flatMap((log) => log.data.map(e => (e instanceof Error ? e.message : String(e))));
+
+    const foundError = errorMessages.length > 0;
+
+    if (foundError) {
+      // 1. An error was found. Set the flag to true BEFORE you "shout".
+      errorPropagationFlag.current = true;
+      const combinedMessage = errorMessages.join("\n");
+      onErrorChange(true, combinedMessage);
+    } else {
+      // 2. No error was found. Check if we are expecting an "echo".
+      if (errorPropagationFlag.current) {
+        // 3. The flag is true, so this is the echo.
+        // Reset the flag to false and, crucially, DO NOTHING ELSE.
+        errorPropagationFlag.current = false;
+      } else {
+        // 4. The flag is false, so this is a genuine "clear" event.
+        // Propagate the change as normal.
+        onErrorChange(false, null);
+      }
+    }
+  }, [logs, onErrorChange]); // Depends on the STABLE onErrorChange from useCallback
+
+  return null;
+};
 
 // Constant Arrays
 const quickActions = [
@@ -118,13 +164,25 @@ export default function GeneratePage() {
   const [fullMarkdown, setFullMarkdown] = useState<string>("");
   // Track saved project id to create new versions on subsequent saves
   const [projectId, setProjectId] = useState<string | null>(null);
-  // Edit prompt
+  const [sandpackKey, setSandpackKey] = useState(Date.now());
   const [editText, setEditText] = useState<string>("");
   // const [isLoadingHistory, setIsLoadingHistory] = useState(true); // Commented out - unused
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
+  type Phase = 'refine' | 'generated'
+  const [phase, setPhase] = useState<Phase>('refine')
+
+
+const [hasError, setHasError] = useState(false);
+const [lastError, setLastError] = useState<string>("");
+
+const handleErrorChange = useCallback((hasError: boolean, errorMessage: string | null) => {
+  setHasError(hasError);
+  setLastError(errorMessage || "");
+}, [hasError, lastError]);
+
 
   // Allow overriding backend URL via Vite env, fallback to localhost
   const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
@@ -838,6 +896,7 @@ export default fallbackFunction;`;
         if (artifacts.length > 0) {
           const files = artifacts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
           setGeneratedFiles(files);
+          setSandpackKey(Date.now())
           const tree = buildFileTree(files);
           setFileTree(tree);
           setSelectedFile(files[0]);
@@ -845,9 +904,11 @@ export default fallbackFunction;`;
           setProjectId(data.project?.id || pid);
           // Rebuild a markdown preview to enable Save button and parity with streamed format
           setFullMarkdown(filesToMarkdown(files));
+          setPhase('generated')
         } else {
           // Still set project id so saving creates version 1
           setProjectId(data.project?.id || pid);
+          setPhase('generated')
         }
       } catch (e) {
         console.error('Failed to load project', e);
@@ -990,73 +1051,113 @@ export default fallbackFunction;`;
     }
   };
 
-  const handleSend = async (prompt?: string) => {
-    const messageContent = prompt || input;
-    const currentTimestamp = new Date();
+  
+  const saveProjectIfNeeded = async (): Promise<string | null> => {
+    try {
+      if (!fullMarkdown) return projectId;
+      const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
+      const targetId = projectId || 'new';
+      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+      });
+      if (res.status === 404 && targetId !== 'new') {
+        res = await fetch(`${BASE_URL}/api/projects/new/save`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+        });
+      }
+      if (!res.ok) return projectId;
+      const data = await res.json();
+      if (data.project_id) {
+        setProjectId(data.project_id);
+        if (user?.id) {
+          localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
+        }
+        return data.project_id as string;
+      }
+      return projectId;
+    } catch {
+      return projectId;
+    }
+  }
 
-    // Add user message to UI while preserving history
-    setMessages(prev => [...prev, {
-      id: Date.now().toString(),
-      type: 'user',
-      content: messageContent,
-      timestamp: currentTimestamp
-    }]);
+  const classifyIntent = (text: string): 'edit' | 'fix' => {
+    const hasErrorWords = /(error|exception|traceback|stack|typeerror|referenceerror|cannot\s+read|undefined|failed|crash|stack trace)/i.test(text);
+    const looksLikeStack = /:\s*\d+(:\d+)?/g.test(text) || /at\s+\S+\s*\(/i.test(text);
+    return (hasErrorWords || looksLikeStack) ? 'fix' : 'edit';
+  }
+
+  const applyEditFromChat = async (messageContent: string) => {
+    if (!projectId) {
+      const saved = await saveProjectIfNeeded();
+      if (!saved) throw new Error('Project must be saved before applying edits');
+    }
+    const intent = classifyIntent(messageContent);
+    const tId = toast.loading(intent === 'fix' ? 'Fixing error…' : 'Applying edit…');
+    try {
+      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(intent === 'fix' ? { error: messageContent } : { instructions: messageContent })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      console.log('Edit response', data);
+      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
+      if (arts.length > 0) {
+        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
+        setGeneratedFiles(files);
+        setSandpackKey(Date.now());
+        setFileTree(buildFileTree(files));
+        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
+        setFullMarkdown(filesToMarkdown(files));
+      }
+      toast.update(tId, { render: intent === 'fix' ? `Fix applied (v${data.version})` : `Edit applied (v${data.version})`, type: 'success', isLoading: false, autoClose: 2500 });
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: intent === 'fix' ? 'Applied fix to your reported error.' : 'Applied the requested edits.', timestamp: new Date() }]);
+    } catch (e: any) {
+      toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Edit failed: ${e.message}`, timestamp: new Date() }]);
+    }
+  }
+
+    const handleSend = async (prompt?: string) => {
+    const messageContent = prompt || input;
+
+
+    setMessages(prev => [...prev, { id: Date.now().toString(), type: 'user', content: messageContent, timestamp: new Date() }]);
     setInput("");
 
-    // Store user message in history
-    // await storeChatMessage(messageContent, 'user');
+    if (phase === 'generated') {
+      // After code generation, route chat to edits/fixes
+      await applyEditFromChat(messageContent);
+      return;
+    }
 
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
-      // Ensure we have a valid session id from backend before refining
-      let activeSessionId = sessionId;
-      if (!activeSessionId) {
-        activeSessionId = await startConversation();
-        // Optionally persist for UX, but do not rely on it for correctness
-        try { localStorage.setItem("sessionid", String(activeSessionId)); } catch { }
-      }
+      let sessionid;
 
-      let res = await fetch(`${BASE_URL}/refine`, {
+      if (!sessionId) {
+        sessionid = await startConversation();
+        localStorage.setItem("sessionid", sessionid)
+      }
+      console.log(sessionid)
+      const res = await fetch(`${BASE_URL}/refine`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ session_id: activeSessionId, message: messageContent }),
+        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
       });
-
-      // If AI in-memory sessions were reset, recover by starting a new session and retrying once
-      if (res.status === 404) {
-        activeSessionId = await startConversation();
-        try { localStorage.setItem("sessionid", String(activeSessionId)); } catch { }
-        res = await fetch(`${BASE_URL}/refine`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ session_id: activeSessionId, message: messageContent }),
-        });
-      }
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
-
-      // Add assistant message to UI while preserving history
-      const responseTimestamp = new Date();
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        type: 'assistant',
-        content: data.reply,
-        timestamp: responseTimestamp
-      }]);
-
-      // Store assistant message in history
-      // await storeChatMessage(data.reply, 'assistant');
-
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
       toast.update(loadingToastId, { render: "Response received!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
-      const errorMessage = `Error: ${err.message}`;
-      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: errorMessage, timestamp: new Date() }]);
-
-      // Store error message in history
-      // await storeChatMessage(errorMessage, 'error');
-
-      toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
+      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     }
   };
 
@@ -1113,6 +1214,8 @@ export default fallbackFunction;`;
         }
       }
       setFullMarkdown(responseText);
+      setPhase('generated');
+      await saveProjectIfNeeded();
       toast.update(loadingToastId, { render: "Code generated!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
       const errorMessage = `Error: ${err.message}`;
@@ -1165,82 +1268,6 @@ export default fallbackFunction;`;
     }
   };
 
-  const handleApplyEdit = async () => {
-    if (!projectId) {
-      toast.error("Save the project first to enable edits");
-      return;
-    }
-    if (!token) {
-      toast.error("Please sign in");
-      return;
-    }
-    if (!editText.trim()) {
-      toast.error("Enter what you want to change");
-      return;
-    }
-    const tId = toast.loading("Applying edit...");
-    try {
-      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ instructions: editText })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
-      if (arts.length > 0) {
-        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
-        setGeneratedFiles(files);
-        setFileTree(buildFileTree(files));
-        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
-        setFullMarkdown(filesToMarkdown(files));
-      }
-      toast.update(tId, { render: `Edit applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
-    } catch (e: any) {
-      toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
-    }
-  };
-
-  const handleFixError = async () => {
-    if (!projectId) {
-      toast.error("Save the project first to enable fixes");
-      return;
-    }
-    if (!token) {
-      toast.error("Please sign in");
-      return;
-    }
-    // Try latest error from chat messages; fallback to prompt()
-    const lastErrMsg = [...messages].reverse().find(m => m.type === 'error')?.content;
-    let errorText = lastErrMsg || '';
-    if (!errorText) {
-      // eslint-disable-next-line no-alert
-      const manual = window.prompt('Paste the error message to fix:');
-      if (!manual) return;
-      errorText = manual;
-    }
-    const tId = toast.loading("Fixing error...");
-    try {
-      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ error: errorText })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
-      if (arts.length > 0) {
-        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
-        setGeneratedFiles(files);
-        setFileTree(buildFileTree(files));
-        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
-        setFullMarkdown(filesToMarkdown(files));
-      }
-      toast.update(tId, { render: `Fix applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
-    } catch (e: any) {
-      toast.update(tId, { render: `Fix failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
-    }
-  };
 
   const handleCodeEdit = (newCode: string | undefined) => {
     if (selectedFile && newCode !== undefined) {
@@ -1457,7 +1484,7 @@ export default fallbackFunction;`;
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="flex-shrink-0">
         <ToastContainer position="bottom-right" theme="dark" />
@@ -1559,22 +1586,6 @@ export default fallbackFunction;`;
                   >
                     Save Project
                   </Button>
-                  <div className="mt-3 space-y-2">
-                    <Textarea
-                      placeholder="Describe an edit (e.g., make shadows darker and background midnight blue)"
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      className="min-h-[64px]"
-                    />
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" onClick={handleApplyEdit} disabled={!projectId}>
-                        <Wand2 className="h-4 w-4 mr-1" /> Apply Edit
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={handleFixError} disabled={!projectId}>
-                        <Bug className="h-4 w-4 mr-1" /> Fix Error
-                      </Button>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="flex-1">
@@ -1629,7 +1640,7 @@ export default fallbackFunction;`;
                       placeholder="Describe what to build or modify..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      className="min-h-[60px] resize-none pr-12"
+                       className={`min-h-[60px] resize-none ${(!hasError || isGenerating) ? 'pr-12' : 'pr-36'}`}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -1637,14 +1648,28 @@ export default fallbackFunction;`;
                         }
                       }}
                     />
-                    <Button
-                      size="icon"
-                      className="absolute bottom-3 right-3"
-                      onClick={() => handleSend()}
-                      disabled={!input.trim() || isGenerating}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
+                    <div className="absolute bottom-3 right-3 flex flex-row gap-2">
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                if (lastError.trim()) {
+                  await applyEditFromChat(`Refine the code to fix the following error:\n${lastError}`);
+                }
+              }}
+              className={hasError && !isGenerating ? "inline-flex" : "hidden"}
+              size="sm"
+            >
+              <Bug className="h-4 w-4 mr-1" /> {hasError ? 'Fix Error' : 'No Errors'}
+            </Button>
+            <Button
+              size="icon"
+              onClick={() => handleSend()}
+              disabled={!input.trim() || isGenerating}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+
                   </div>
                 </div>
               </div>
@@ -1711,6 +1736,7 @@ export default fallbackFunction;`;
                   <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
                     {selectedTab === 'preview' && (
                       <SandpackProvider
+                      key={sandpackKey} 
                         files={sandpackConfig.files}
                         template="react-ts"
                         customSetup={{
@@ -1727,6 +1753,9 @@ export default fallbackFunction;`;
                           }
                         }}
                       >
+                        <ErrorListener onErrorChange={handleErrorChange} onFix={function (errorMessage: string): void {
+                            throw new Error("Function not implemented.");
+                          } } />
                         <SandpackLayout style={{ height: "100%", minHeight: 0 }} className="flex-1 min-h-0">
                           {/* <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} /> */}
                           <SandpackPreview style={{ height: "calc(100vh - 240px)" }} />
