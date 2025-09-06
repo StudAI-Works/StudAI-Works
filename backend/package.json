@@ -5,7 +5,10 @@
   "main": "src/index.ts",
   "scripts": {
     "test": "npm run test",
-    "dev": "nodemon src/index.ts"
+    "dev": "nodemon src/index.ts",
+    "build": "tsc",
+    "start": "node dist/src/index.js",
+    "start:dev": "ts-node src/index.ts"
   },
   "repository": {
     "type": "git",
@@ -31,9 +34,9 @@
     "@types/axios": "^0.9.36",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/node": "^24.0.4",
+    "@types/node": "^24.3.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   }
 }
