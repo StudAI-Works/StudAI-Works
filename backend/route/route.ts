@@ -98,6 +98,7 @@ const REQUIRE_AUTH_GENERATE = (process.env.REQUIRE_AUTH_GENERATE || 'true').toLo
 const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || 'true').toLowerCase() !== 'false';
 
 const maybeProtect = (req: Request, res: Response, next: NextFunction) => {
+  
   if (!REQUIRE_AUTH_GENERATE) return next();
   return (protect as any)(req, res, next);
 };
