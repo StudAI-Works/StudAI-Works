@@ -19,12 +19,16 @@ npm run dev
 ```bash
   python -m venv myvenv
   cd myvenv\Scripts\activate
+  cd../..
+  pip install -r requirements.txt
 ```
 - For linux
 ```bash
   python -m venv myvenv
   cd myvenv\Scripts
   source activate
+  cd ../..
+  pip install -r requirements.txt
 ```
 - Start the file
 ```
