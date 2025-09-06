@@ -1,9 +1,9 @@
 "use client"
 
-// import * as React from "react" // Not needed with new JSX transform
+import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 // --- IMPORTANT: We import useTheme from the library, not a custom context ---
-import { useTheme } from "next-themes"
+import { useTheme } from "next-themes" 
 
 import { Button } from "@/components/ui/button"
 import {

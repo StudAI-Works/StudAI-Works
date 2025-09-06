@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-// import { Header } from '@/components/header'; // Commented out as unused
+import { Header } from '@/components/header';
 
 interface UserProfile {
     email: string;
@@ -20,9 +20,9 @@ function Admin() {
     }, []);
 
     return (
-
+        
         <div className="min-h-screen p-6">
-
+           
             <h1 className="text-3xl text-center dark:text-white mb-8 text-black mt-4">Admin Dashboard</h1>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
