@@ -87,7 +87,8 @@ router.delete("/history/files/:fileId", protect, deleteGeneratedFile);
 const REQUIRE_AUTH_GENERATE = (process.env.REQUIRE_AUTH_GENERATE || "true").toLowerCase() !== "false";
 const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || "true").toLowerCase() !== "false";
 
-const maybeProtect = (req: Request, res: Response, next: NextFunction): void => {
+const maybeProtect = (req: Request, res: Response, next: NextFunction) => {
+  
   if (!REQUIRE_AUTH_GENERATE) return next();
   protect(req, res, next);
 };
