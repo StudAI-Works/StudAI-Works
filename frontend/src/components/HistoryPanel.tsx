@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 
 export const HistoryPanel: React.FC = () => {
     const [files, setFiles] = useState<FileHistory[]>([]);
+    const [messages, setMessages] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'files' | 'chat'>('files');
     const [loading, setLoading] = useState(true);
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null);

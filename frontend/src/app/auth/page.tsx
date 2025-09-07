@@ -17,7 +17,6 @@ import { buildApiUrl } from "@/config/api";
 export default function AuthPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  let BASE_URL = 'http://localhost:8080'
 
   const [activeTab, setActiveTab] = useState("signin");
   const [showPassword, setShowPassword] = useState(false);
@@ -46,7 +45,7 @@ export default function AuthPage() {
     setError(null);
 
     try {
-      const response = await fetch(buildApiUrl(`${BASE_URL}/signin`), {
+      const response = await fetch(buildApiUrl('/signin'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: signInEmail, password: signInPassword }),

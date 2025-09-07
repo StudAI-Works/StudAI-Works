@@ -992,7 +992,7 @@ export default fallbackFunction;`;
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
-    const currentTimestamp = new Date().toISOString();
+    const currentTimestamp = new Date();
 
     // Add user message to UI while preserving history
     setMessages(prev => [...prev, {
