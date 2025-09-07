@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { historyService } from '../services/historyService';
-import type { FileHistory, ChatMessage } from '../types/history';
+import type { FileHistory } from '../types/history';
 import { Trash2, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export const HistoryPanel: React.FC = () => {
     const [files, setFiles] = useState<FileHistory[]>([]);
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [activeTab, setActiveTab] = useState<'files' | 'chat'>('files');
     const [loading, setLoading] = useState(true);
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
@@ -18,12 +17,9 @@ export const HistoryPanel: React.FC = () => {
     const loadHistory = async () => {
         try {
             setLoading(true);
-            const [fileHistory, chatHistory] = await Promise.all([
-                historyService.getFileHistory(),
-                historyService.getChatHistory()
-            ]);
+            const fileHistory = await historyService.getFileHistory();
             setFiles(fileHistory);
-            setMessages(chatHistory);
+            // Remove chat history functionality - no longer loading chat messages
         } catch (error: any) {
             console.error('Failed to load history:', error);
             if (error.response?.status === 401) {
@@ -122,7 +118,7 @@ export const HistoryPanel: React.FC = () => {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : (
-                    <div className="dark:bg-black rounded-lg shadow-lg p-4">
+                <div className="dark:bg-black rounded-lg shadow-lg p-4">
                     {activeTab === 'files' ? (
                         <div className="space-y-4">
                             {files.length === 0 ? (

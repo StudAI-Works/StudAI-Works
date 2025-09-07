@@ -915,7 +915,7 @@ export default fallbackFunction;`;
       const lines = section.split('\n');
       const title = lines[0].replace('## 🔹 ', '').trim();
       const content = lines.slice(1).join('\n').trim();
-      
+
       // Only save markdown sections as .md files, not as code files
       if (title !== 'Code Files' && content) {
         const mdFilename = `${title.toLowerCase().replace(/\s+/g, '-')}.md`;
@@ -963,7 +963,7 @@ export default fallbackFunction;`;
   const startConversation = async () => {
     const loadingToastId = toast.loading("Starting conversation...");
     try {
-      const res = await fetch(`${BASE_URL}/api/start-conversation`, {
+      const res = await fetch(`${BASE_URL}/start-conversation`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -1075,7 +1075,7 @@ export default fallbackFunction;`;
     const loadingToastId = toast.loading("Generating code...");
 
     try {
-      const response = await fetch(`http://localhost:8000/generate`, {
+      const response = await fetch(`${BASE_URL}/api/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: sessionid }),
@@ -1329,7 +1329,7 @@ export default fallbackFunction;`;
   // Helper function to get MIME type based on file extension
   const getFileType = (filePath: string): string => {
     const extension = filePath.split('.').pop()?.toLowerCase();
-    
+
     const mimeTypes: Record<string, string> = {
       // Web files
       'html': 'text/html',
@@ -1341,21 +1341,21 @@ export default fallbackFunction;`;
       'tsx': 'application/typescript',
       'json': 'application/json',
       'xml': 'application/xml',
-      
+
       // Text files
       'txt': 'text/plain',
       'md': 'text/markdown',
       'markdown': 'text/markdown',
       'yml': 'text/yaml',
       'yaml': 'text/yaml',
-      
+
       // Configuration files
       'config': 'text/plain',
       'conf': 'text/plain',
       'env': 'text/plain',
       'gitignore': 'text/plain',
       'dockerfile': 'text/plain',
-      
+
       // Programming languages
       'py': 'text/x-python',
       'java': 'text/x-java-source',
@@ -1368,12 +1368,12 @@ export default fallbackFunction;`;
       'sh': 'application/x-sh',
       'bat': 'application/x-bat',
       'ps1': 'application/x-powershell',
-      
+
       // Package files
       'lock': 'text/plain',
       'package': 'application/json',
     };
-    
+
     return mimeTypes[extension || ''] || 'text/plain';
   };
 
@@ -1383,7 +1383,6 @@ export default fallbackFunction;`;
       await historyService.storeFile(content, fileName, fileType);
     } catch (error) {
       console.error('Failed to store generated file:', error);
-      toast.error('Failed to save file to history');
     }
   };
 
@@ -1392,20 +1391,9 @@ export default fallbackFunction;`;
     const loadChatHistory = async () => {
       setIsLoadingHistory(true);
       try {
-        const history = await historyService.getChatHistory();
-
-        // Convert history items to the message format used in the component
-        const formattedMessages = history.map(msg => ({
-          id: msg.id || Date.now().toString(),
-          type: msg.role as 'user' | 'assistant' | 'error',
-          content: msg.message,
-          timestamp: new Date(msg.created_at)
-        }));
-
-        // Sort messages by timestamp ascending (oldest first)
-        formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-        setMessages(formattedMessages);
+        // Remove chat history functionality - no longer loading chat messages
+        // Just set empty messages array
+        setMessages([]);
       } catch (error) {
         console.error('Failed to load chat history:', error);
         toast.error('Failed to load chat history');

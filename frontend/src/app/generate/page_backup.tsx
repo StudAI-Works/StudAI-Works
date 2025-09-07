@@ -63,7 +63,7 @@ export default function GeneratePage() {
     }
 
     // Find the main component file
-    const mainFile = generatedFiles.find(f => 
+    const mainFile = generatedFiles.find(f =>
       f.path.toLowerCase().includes('app.tsx') ||
       f.path.toLowerCase().includes('app.jsx') ||
       f.path.toLowerCase().includes('index.tsx') ||
@@ -145,7 +145,7 @@ body {
     // Add generated files
     generatedFiles.forEach(file => {
       const cleanPath = `/src/${file.path.replace(/^\/+/, '')}`;
-      files[cleanPath] = { 
+      files[cleanPath] = {
         code: file.content.replace(/import\.meta\.env\.VITE_/g, 'process.env.REACT_APP_')
       };
     });
@@ -186,7 +186,7 @@ body {
     while ((match = regex.exec(response)) !== null) {
       const [, , pathComment, content] = match;
       let filePath = pathComment || 'App.tsx';
-      
+
       // Clean up file path
       filePath = filePath.replace(/^(File:|Path:|\s)+/i, '').trim();
       if (!filePath.includes('.')) {
@@ -313,7 +313,7 @@ body {
   return (
     <div className="flex flex-col h-screen bg-background">
       <Header user={user} onLogout={logout} />
-      
+
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           <ResizablePanel defaultSize={50} minSize={30}>
@@ -321,7 +321,7 @@ body {
               <div className="p-4 border-b">
                 <h2 className="text-lg font-semibold">Chat with AI</h2>
               </div>
-              
+
               <ScrollArea className="flex-1 p-4">
                 <div className="space-y-4">
                   {messages.map((message) => (
@@ -330,13 +330,12 @@ body {
                       className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-lg p-3 ${
-                          message.type === "user"
-                            ? "bg-primary text-primary-foreground"
-                            : message.type === "error"
+                        className={`max-w-[80%] rounded-lg p-3 ${message.type === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : message.type === "error"
                             ? "bg-destructive text-destructive-foreground"
                             : "bg-muted"
-                        }`}
+                          }`}
                       >
                         <div className="text-sm whitespace-pre-wrap">{message.content}</div>
                         <div className="text-xs opacity-70 mt-1">
@@ -373,8 +372,8 @@ body {
                       }
                     }}
                   />
-                  <Button 
-                    onClick={() => handleSend()} 
+                  <Button
+                    onClick={() => handleSend()}
                     disabled={isGenerating || !input.trim()}
                     size="icon"
                   >
@@ -401,7 +400,7 @@ body {
                       Preview
                     </TabsTrigger>
                   </TabsList>
-                  
+
                   {generatedFiles.length > 0 && (
                     <div className="flex space-x-2">
                       <Button variant="outline" size="sm" onClick={() => {
@@ -443,9 +442,9 @@ body {
                           </ScrollArea>
                         </div>
                       </ResizablePanel>
-                      
+
                       <ResizableHandle />
-                      
+
                       <ResizablePanel defaultSize={75}>
                         <div className="h-full">
                           {selectedFile && (
@@ -499,7 +498,7 @@ body {
                       options={sandpackConfig.options}
                     >
                       <SandpackLayout>
-                        <SandpackPreview 
+                        <SandpackPreview
                           style={{ height: "100%" }}
                           showOpenInCodeSandbox={true}
                           showRefreshButton={true}
@@ -539,13 +538,12 @@ body {
 
   function FileTreeItem({ node, level = 0 }: { node: FileTreeNode; level?: number }) {
     const isExpanded = expandedFolders.has(node.path);
-    
+
     return (
       <div>
         <div
-          className={`flex items-center py-1 px-2 rounded cursor-pointer hover:bg-muted/50 ${
-            selectedFile?.path === node.path ? 'bg-muted' : ''
-          }`}
+          className={`flex items-center py-1 px-2 rounded cursor-pointer hover:bg-muted/50 ${selectedFile?.path === node.path ? 'bg-muted' : ''
+            }`}
           style={{ paddingLeft: `${8 + level * 16}px` }}
           onClick={() => {
             if (node.type === 'folder') {
@@ -580,7 +578,7 @@ body {
           )}
           <span className="text-sm truncate">{node.name}</span>
         </div>
-        
+
         {node.type === 'folder' && isExpanded && node.children && (
           <div>
             {node.children.map((child) => (

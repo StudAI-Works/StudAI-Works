@@ -27,8 +27,10 @@ const router: Router = Router();
 const RAW_FASTAPI_URL = process.env.FASTAPI_URL;
 const FASTAPI_HOST = process.env.FASTAPI_HOST || "localhost";
 const FASTAPI_PORT = process.env.FASTAPI_PORT || "8000";
-const FAST_API = RAW_FASTAPI_URL?.replace(/\/$/, "") || `http://${FASTAPI_HOST.replace(/\/$/, "")}:${FASTAPI_PORT}`;
+// const FAST_API = RAW_FASTAPI_URL?.replace(/\/$/, "") || `http://${FASTAPI_HOST.replace(/\/$/, "")}:${FASTAPI_PORT}`;
+let FAST_API = process.env.FASTAPI_URL;
 
+console.log(FAST_API)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -36,6 +38,7 @@ const upload = multer({
 
 // Public routes
 router.get("/", (_req: Request, res: Response): void => {
+  console.log(FAST_API)
   res.send("Welcome to StudAI Backend");
 });
 router.post("/signup", SignUpUser);
@@ -48,7 +51,8 @@ router.get("/profile", protect, getProfile);
 router.get("/allusers", protect, Allusers);
 
 // Conversational AI routes
-router.post("/api/start-conversation", async (_req: Request, res: Response): Promise<void> => {
+router.post("/start-conversation", async (_req: Request, res: Response): Promise<void> => {
+  console.log(FAST_API)
   try {
     const response = await axios.post(`${FAST_API}/start-conversation`);
     res.status(200).json(response.data);
@@ -60,6 +64,7 @@ router.post("/api/start-conversation", async (_req: Request, res: Response): Pro
 
 // Refine feature
 const handleRefine = async (req: Request, res: Response): Promise<void> => {
+  console.log(FAST_API)
   const { session_id, message } = req.body;
   if (!session_id || !message) {
     res.status(400).json({ error: "session_id and message are required" });
@@ -74,7 +79,6 @@ const handleRefine = async (req: Request, res: Response): Promise<void> => {
   }
 };
 router.post("/refine", handleRefine);
-router.post("/api/refine", handleRefine);
 
 // History routes
 router.get("/history/chat", protect, getChatHistory);
@@ -107,7 +111,8 @@ const maybeProtectProjects = (req: Request, res: Response, next: NextFunction): 
 };
 
 // Generate route with stream
-router.post("/api/generate", maybeProtect, async (req: Request, res: Response): Promise<void> => {
+router.post("/api/generate", async (req: Request, res: Response): Promise<void> => {
+  console.log(req.body)
   const { session_id } = req.body;
   if (!session_id) {
     res.status(400).json({ error: "session_id is required" });
@@ -120,7 +125,7 @@ router.post("/api/generate", maybeProtect, async (req: Request, res: Response): 
 
     const response = await axios({
       method: "post",
-      url: `${FAST_API}/api/generate`,
+      url: `${FAST_API}/generate`,
       data: { session_id },
       responseType: "stream",
     });
@@ -145,13 +150,13 @@ router.post("/api/generate", maybeProtect, async (req: Request, res: Response): 
 });
 
 // GET /api/generate guidance
-router.get("/api/generate", (_req: Request, res: Response): void => {
-  res.status(405).json({
-    error: "Method Not Allowed",
-    message: "Use POST /api/generate with JSON body { session_id } and Authorization bearer token.",
-    example: { session_id: "<session-id>" },
-  });
-});
+// router.get("/generate", (_req: Request, res: Response): void => {
+//   res.status(405).json({
+//     error: "Method Not Allowed",
+//     message: "Use POST /api/generate with JSON body { session_id } and Authorization bearer token.",
+//     example: { session_id: "<session-id>" },
+//   });
+// });
 
 // AI health check
 router.get("/api/ai/health", async (_req: Request, res: Response): Promise<void> => {

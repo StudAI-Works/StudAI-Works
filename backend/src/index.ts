@@ -11,7 +11,7 @@ import router from "../route/route";
 const PORT = Number(process.env.PORT) || Number(process.env.WEBSITES_PORT) || 8080;
 const HOST = process.env.HOST || process.env.WEBSITES_HOSTNAME || '0.0.0.0';
 
-app.use(router);
+app.use('/', router);
 
 // ✅ Absolute path to frontend/dist (from backend/src)
 const frontendPath = path.join(__dirname, "../../frontend/dist");

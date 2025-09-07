@@ -29,7 +29,7 @@ export default function AccountPage() {
   const [bio, setBio] = useState("");
   const [website, setWebsite] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
-  
+
   // State for UI feedback
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [isFetchingProfile, setIsFetchingProfile] = useState(true);
@@ -47,9 +47,9 @@ export default function AccountPage() {
             headers: { "Authorization": `Bearer ${token}` }
           });
           if (!response.ok) throw new Error("Could not load your profile data.");
-          
+
           const profileData = await response.json();
-          
+
           setFullName(profileData.full_name || user.fullName);
           setBio(profileData.bio || "");
           setWebsite(profileData.website || "");
@@ -77,7 +77,7 @@ export default function AccountPage() {
     try {
       const response = await fetch(`${API_URL}/profile`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
@@ -128,7 +128,7 @@ export default function AccountPage() {
       }
 
       const data = await response.json();
-      setAvatarUrl(data.avatarUrl); 
+      setAvatarUrl(data.avatarUrl);
       alert("Avatar updated!");
     } catch (error) {
       alert((error as Error).message);
@@ -144,7 +144,7 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header user={headerUser} onLogout={logout} />
-      
+
       <input type="file" ref={avatarFileRef} onChange={handleAvatarChange} hidden accept="image/*" />
 
       {/* --- ADD THE CROPPER COMPONENT TO THE PAGE --- */}

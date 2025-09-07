@@ -13,17 +13,17 @@ function Home() {
         .then(res => {
           console.log(res)
           if (res.data) {
-            toast.success("Sent", {autoClose:1500, style:{fontSize:"14px", width:"140px"}})
+            toast.success("Sent", { autoClose: 1500, style: { fontSize: "14px", width: "140px" } })
           }
           else {
-            toast.error("Faild",{autoClose:1500})
+            toast.error("Faild", { autoClose: 1500 })
           }
         })
     }
   }
   return (
     <div className='text-3xl relative w-screen min-h-screen overflow-y-auto'>
-      <ToastContainer/>
+      <ToastContainer />
       <p className='text-lg'> Home part </p>
 
       <div></div>
