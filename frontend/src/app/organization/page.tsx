@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Navigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Navigate } from "react-router-dom"
 import {
   Dialog,
   DialogContent,
@@ -97,7 +97,7 @@ export default function OrganizationPage() {
   // --- GET THE REAL USER FROM THE CONTEXT ---
   const { user, logout } = useAuth();
   if (!user) {
-    return <Navigate to="/auth" replace />;
+  return <Navigate to="/auth" replace />;
   }
 
   const getRoleColor = (role: string) => {
@@ -198,7 +198,7 @@ export default function OrganizationPage() {
                         <Label htmlFor="org-name">Organization Name</Label>
                         <Input id="org-name" placeholder="Your Organization Name" />
                       </div>
-                      <div>
+                      <div> 
                         <Label htmlFor="org-description">Description</Label>
                         <Textarea id="org-description" placeholder="What does your organization do?" rows={3} />
                       </div>

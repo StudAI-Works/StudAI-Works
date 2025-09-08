@@ -55,7 +55,8 @@ export function ChatWidget() {
 
     try {
       // Store user message
-      await historyService.storeChatMessage(input, 'user');
+      // Remove chat history functionality
+      // await historyService.storeChatMessage(input, 'user');
 
       // Get bot response
       const botResponse = generateBotResponse(input);
@@ -69,7 +70,8 @@ export function ChatWidget() {
       setMessages((prev) => [...prev, botMessage])
 
       // Store bot message
-      await historyService.storeChatMessage(botResponse, 'assistant');
+      // Remove chat history functionality
+      // await historyService.storeChatMessage(botResponse, 'assistant');
 
       // If the response contains generated code or file, store it
       if (botResponse.includes('```') || botResponse.includes('Generated file:')) {
@@ -88,16 +90,16 @@ export function ChatWidget() {
     if (isOpen) {
       const loadChatHistory = async () => {
         try {
-          const history = await historyService.getChatHistory();
-          if (history.length > 0) {
-            const formattedMessages: ChatMessage[] = history.map(msg => ({
-              id: msg.id,
-              type: msg.role === 'user' ? 'user' : 'bot',
-              content: msg.message,
-              timestamp: new Date(msg.created_at)
-            }));
-            setMessages(formattedMessages);
-          }
+          // Remove chat history functionality - no longer loading chat messages
+          // Just keep the default welcome message
+          setMessages([
+            {
+              id: '1',
+              type: 'bot',
+              content: 'Hello! How can I help you today?',
+              timestamp: new Date()
+            }
+          ]);
         } catch (error) {
           console.error('Failed to load chat history:', error);
         }
@@ -190,8 +192,8 @@ export function ChatWidget() {
                   <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`max-w-[80%] rounded-lg p-3 ${message.type === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
                         }`}
                     >
                       <div className="flex items-start space-x-2">

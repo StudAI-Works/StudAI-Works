@@ -88,19 +88,19 @@ export default App`
 
 export default function EditorPage() {
   const [isRunning, setIsRunning] = useState(false);
-const [projectName, setProjectName] = useState("My Awesome Project");
-const [saveStatus, setSaveStatus] = useState("saved");
-const { user, logout } = useAuth();
+  const [projectName, setProjectName] = useState("My Awesome Project");
+  const [saveStatus, setSaveStatus] = useState("saved");
+  const { user, logout } = useAuth();
 
-if (!user) {
-  return <Navigate to="/auth" replace />;
-}
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
-const headerUser = {
-  name: user.fullName,
-  email: user.email,
-  avatar: "/placeholder.svg?height=32&width=32",
-};
+  const headerUser = {
+    name: user.fullName,
+    email: user.email,
+    avatar: "/placeholder.svg?height=32&width=32",
+  };
 
   const handleRun = () => {
     setIsRunning(!isRunning)

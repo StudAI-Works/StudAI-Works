@@ -1,7 +1,7 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy Node.js app to Azure Web App - studai-builder-backend
+name: Build and deploy Node.js app to Azure Web App - StudAI-Builder
 
 on:
   push:
@@ -51,15 +51,15 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_42353A54F04A4204AE92B625E8B84B2A }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_D1907F2F2AAE41768360328BBA158B8C }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_34BF57F2173644F1AFEF279FF1C694F4 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_385FC4BD341C4637984EC8BE856D3BCE }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3199585888324E68B30E90FB6596D6E9 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_EA8FFF867CC642039A5E01C00A3430E4 }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'studai-builder-backend'
+          app-name: 'StudAI-Builder'
           slot-name: 'Production'
           package: .
           

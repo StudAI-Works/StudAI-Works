@@ -166,7 +166,7 @@ export default function GeneratePage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [sandpackKey, setSandpackKey] = useState(Date.now());
   const [editText, setEditText] = useState<string>("");
-  // const [isLoadingHistory, setIsLoadingHistory] = useState(true); // Commented out - unused
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { user, token, logout } = useAuth();
@@ -1024,7 +1024,7 @@ export default fallbackFunction;`;
   const startConversation = async () => {
     const loadingToastId = toast.loading("Starting conversation...");
     try {
-      const res = await fetch(`${BASE_URL}/api/start-conversation`, {
+      const res = await fetch(`${BASE_URL}/start-conversation`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -1176,7 +1176,7 @@ export default fallbackFunction;`;
     const loadingToastId = toast.loading("Generating code...");
 
     try {
-      const response = await fetch(`http://localhost:8000/generate`, {
+      const response = await fetch(`${BASE_URL}/api/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: sessionid }),
@@ -1410,34 +1410,22 @@ export default fallbackFunction;`;
       await historyService.storeFile(content, fileName, fileType);
     } catch (error) {
       console.error('Failed to store generated file:', error);
-      toast.error('Failed to save file to history');
     }
   };
 
   // Load chat history when component mounts
   useEffect(() => {
     const loadChatHistory = async () => {
-      // setIsLoadingHistory(true); // Commented out since variable is unused
+      setIsLoadingHistory(true);
       try {
-        const history = await historyService.getChatHistory();
-
-        // Convert history items to the message format used in the component
-        const formattedMessages = history.map(msg => ({
-          id: msg.id || Date.now().toString(),
-          type: msg.role as 'user' | 'assistant' | 'error',
-          content: msg.message,
-          timestamp: new Date(msg.created_at)
-        }));
-
-        // Sort messages by timestamp ascending (oldest first)
-        formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-        setMessages(formattedMessages);
+        // Remove chat history functionality - no longer loading chat messages
+        // Just set empty messages array
+        setMessages([]);
       } catch (error) {
         console.error('Failed to load chat history:', error);
         toast.error('Failed to load chat history');
       } finally {
-        // setIsLoadingHistory(false); // Commented out since variable is unused
+        setIsLoadingHistory(false);
       }
     };
 

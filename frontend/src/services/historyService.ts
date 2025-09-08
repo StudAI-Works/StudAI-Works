@@ -1,7 +1,6 @@
 import axios from 'axios';
-import type { FileHistory, ChatMessage } from '../types/history';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+import type { FileHistory } from '../types/history';
+import { buildApiUrl } from '../config/api';
 
 // Get auth token and user ID from localStorage
 const getAuthData = () => {
@@ -24,7 +23,7 @@ export const historyService = {
             console.log('Storing file:', { fileName, fileType, contentLength: fileContent.length });
 
             const response = await axios.post(
-                `${API_URL}/history/file`,
+                buildApiUrl('/api/history/file'),
                 {
                     fileContent,
                     fileName,
@@ -40,30 +39,14 @@ export const historyService = {
         }
     },
 
-    // Store chat message
-    async storeChatMessage(message: string, role: 'user' | 'assistant'): Promise<void> {
-        try {
-            const { headers } = getAuthData();
-            await axios.post(
-                `${API_URL}/history/chat`,
-                {
-                    message,
-                    role
-                },
-                { headers }
-            );
-        } catch (error) {
-            console.error('Failed to store chat message:', error);
-            throw error;
-        }
-    },
+
 
     // Get file history
     async getFileHistory(): Promise<FileHistory[]> {
         try {
             const { headers } = getAuthData();
             const response = await axios.get(
-                `${API_URL}/history/files`,
+                buildApiUrl('/api/history/files'),
                 { headers }
             );
             console.log('File history response:', response.data);
@@ -74,23 +57,7 @@ export const historyService = {
         }
     },
 
-    // Get chat history
-    async getChatHistory(): Promise<ChatMessage[]> {
-        try {
-            const { headers, userId } = getAuthData();
-            console.log('Getting chat history for user:', userId);
 
-            const response = await axios.get(
-                `${API_URL}/history/chat`,
-                { headers }
-            );
-            console.log('Chat history response:', response.data);
-            return response.data;
-        } catch (error) {
-            console.error('Failed to fetch chat history:', error);
-            throw error;
-        }
-    },
 
     // Delete file
     async deleteFile(fileId: string): Promise<void> {
@@ -99,7 +66,7 @@ export const historyService = {
             console.log('Deleting file:', fileId);
 
             await axios.delete(
-                `${API_URL}/history/files/${fileId}`,
+                buildApiUrl(`/api/history/files/${fileId}`),
                 { headers }
             );
             console.log('File deleted successfully');

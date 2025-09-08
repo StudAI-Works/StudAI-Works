@@ -12,11 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Code, Mail, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "../context/authContext";
+import { buildApiUrl } from "@/config/api";
 
-
-const API_URL = "http://localhost:8080" 
-
-export default function  AuthPage() {
+export default function AuthPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -45,9 +43,9 @@ export default function  AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const response = await fetch(`${API_URL}/signin`, {
+      const response = await fetch(buildApiUrl('/signin'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: signInEmail, password: signInPassword }),
@@ -85,7 +83,7 @@ export default function  AuthPage() {
 
     try {
       console.log(signUpName)
-      const response = await fetch(`${API_URL}/signup`, {
+      const response = await fetch(buildApiUrl('/api/signup'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -100,7 +98,7 @@ export default function  AuthPage() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to create account.");
       }
-      
+
       setSignupSuccess(true);
       handleTabChange("signin");
       setSignUpName("");
@@ -117,7 +115,7 @@ export default function  AuthPage() {
   const handleGoogleAuth = () => {
     alert("Google authentication is not yet implemented.");
   };
-  
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -166,7 +164,7 @@ export default function  AuthPage() {
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
-                
+
                 <div className="mt-4 text-center">
                   <Link to="#" className="text-sm text-muted-foreground hover:text-primary">
                     Forgot your password?
@@ -189,19 +187,19 @@ export default function  AuthPage() {
                     <Label htmlFor="signup-password">Password</Label>
                     <div className="relative">
                       <Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="Create a password" required value={signUpPassword} onChange={(e) => setSignUpPassword(e.target.value)} />
-                       <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
+                      <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
-                   {error && activeTab === 'signup' && <p className="text-sm font-medium text-destructive">{error}</p>}
+                  {error && activeTab === 'signup' && <p className="text-sm font-medium text-destructive">{error}</p>}
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Creating account..." : "Create Account"}
                   </Button>
                 </form>
               </TabsContent>
             </Tabs>
-            
+
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">

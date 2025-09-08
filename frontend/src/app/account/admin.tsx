@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-// import { Header } from '@/components/header'; // Commented out as unused
+import { Header } from '@/components/header';
 
 interface UserProfile {
     email: string;
