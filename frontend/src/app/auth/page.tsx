@@ -15,6 +15,7 @@ import { useAuth } from "../context/authContext";
 import { buildApiUrl } from "@/config/api";
 
 export default function AuthPage() {
+  const BASE_URL = 'http://localhost:8080'
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -45,7 +46,7 @@ export default function AuthPage() {
     setError(null);
 
     try {
-      const response = await fetch(buildApiUrl('/signin'), {
+      const response = await fetch((`${BASE_URL}/signin`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: signInEmail, password: signInPassword }),
@@ -83,7 +84,7 @@ export default function AuthPage() {
 
     try {
       console.log(signUpName)
-      const response = await fetch(buildApiUrl('/api/signup'), {
+      const response = await fetch(`${BASE_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
