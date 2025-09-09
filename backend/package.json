@@ -1,0 +1,42 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Backend part",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "npm run test",
+    "dev": "nodemon src/index.ts",
+    "build": "tsc",
+    "start": "node dist/src/index.js",
+    "start:dev": "ts-node src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StudAI-Works/StudAI-Works.git"
+  },
+  "author": "Damodara Prakash, Avdhoot Chaubal, Mathu Mathi, Sharon Paul",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/StudAI-Works/StudAI-Works/issues"
+  },
+  "homepage": "https://github.com/StudAI-Works/StudAI-Works#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.2",
+    "@types/multer": "^2.0.0",
+    "axios": "^1.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "multer": "^2.0.1",
+    "supabase": "^2.30.4"
+  },
+  "devDependencies": {
+    "@types/axios": "^0.9.36",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.3.1",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}

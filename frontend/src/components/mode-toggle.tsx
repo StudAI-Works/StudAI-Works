@@ -1,0 +1,70 @@
+"use client"
+
+import * as React from "react"
+import { Moon, Sun } from "lucide-react"
+// --- IMPORTANT: We import useTheme from the library, not a custom context ---
+import { useTheme } from "next-themes"
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+export function ModeToggle() {
+  // This hook now correctly connects to your ThemeProvider
+  const { setTheme } = useTheme()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon">
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="center"
+        side="bottom"
+        className="z-[99999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg min-w-[120px]"
+        sideOffset={5}
+        style={{
+          pointerEvents: 'auto',
+          position: 'fixed',
+          zIndex: 99999,
+          backgroundColor: 'var(--background)',
+          border: '1px solid var(--border)',
+          borderRadius: '6px',
+          padding: '4px 0',
+          minWidth: '120px'
+        }}
+      >
+        {/* The onClick handlers now call the library's setTheme function */}
+        <DropdownMenuItem
+          onClick={() => setTheme("light")}
+          className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          style={{ pointerEvents: 'auto' }}
+        >
+          Light
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => setTheme("dark")}
+          className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          style={{ pointerEvents: 'auto' }}
+        >
+          Dark
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => setTheme("system")}
+          className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          style={{ pointerEvents: 'auto' }}
+        >
+          System
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
