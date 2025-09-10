@@ -1,8 +1,12 @@
 // file: src/pages/GeneratePage.tsx
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+
+// Utility function to concatenate class names
+function cn(...classes: (string | undefined | false | null)[]) {
+  return classes.filter(Boolean).join(' ');
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +22,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackCodeEditor, SandpackPreview } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
@@ -44,6 +48,51 @@ interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
+const ErrorListener = ({
+  onFix, // onFix is passed but unused in this specific logic
+  onErrorChange,
+}: {
+  onFix: (errorMessage: string) => void;
+  onErrorChange: (hasError: boolean, errorMessage: string | null) => void;
+}) => {
+  const { sandpack } = useSandpack();
+  const clientId = Object.keys(sandpack.clients)[0];
+  const { logs } = useSandpackConsole({
+    clientId,
+    resetOnPreviewRestart: true,
+  });
+
+  // This ref acts as a flag to break the re-render cycle.
+  const errorPropagationFlag = useRef(false);
+
+  useEffect(() => {
+    const errorMessages = logs
+      .filter((log) => log.method === "error" && Array.isArray(log.data) && log.data.length > 0)
+      .flatMap((log) => log.data.map(e => (e instanceof Error ? e.message : String(e))));
+
+    const foundError = errorMessages.length > 0;
+
+    if (foundError) {
+      // 1. An error was found. Set the flag to true BEFORE you "shout".
+      errorPropagationFlag.current = true;
+      const combinedMessage = errorMessages.join("\n");
+      onErrorChange(true, combinedMessage);
+    } else {
+      // 2. No error was found. Check if we are expecting an "echo".
+      if (errorPropagationFlag.current) {
+        // 3. The flag is true, so this is the echo.
+        // Reset the flag to false and, crucially, DO NOTHING ELSE.
+        errorPropagationFlag.current = false;
+      } else {
+        // 4. The flag is false, so this is a genuine "clear" event.
+        // Propagate the change as normal.
+        onErrorChange(false, null);
+      }
+    }
+  }, [logs, onErrorChange]); // Depends on the STABLE onErrorChange from useCallback
+
+  return null;
+};
 // Constant Arrays
 const quickActions = [
   { icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" },
@@ -119,12 +168,22 @@ export default function GeneratePage() {
   // Track saved project id to create new versions on subsequent saves
   const [projectId, setProjectId] = useState<string | null>(null);
   // Edit prompt
+  const [sandpackKey, setSandpackKey] = useState(Date.now());
   const [editText, setEditText] = useState<string>("");
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  type Phase = 'refine' | 'generated'
+  const [phase, setPhase] = useState<Phase>('refine')
 
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
+const [hasError, setHasError] = useState(false);
+const [lastError, setLastError] = useState<string>("");
+
+const handleErrorChange = useCallback((hasError: boolean, errorMessage: string | null) => {
+  setHasError(hasError);
+  setLastError(errorMessage || "");
+}, [hasError, lastError]);
 
   // Allow overriding backend URL via Vite env, fallback to localhost
   const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
@@ -838,6 +897,7 @@ export default fallbackFunction;`;
         if (artifacts.length > 0) {
           const files = artifacts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
           setGeneratedFiles(files);
+          setSandpackKey(Date.now())
           const tree = buildFileTree(files);
           setFileTree(tree);
           setSelectedFile(files[0]);
@@ -845,9 +905,11 @@ export default fallbackFunction;`;
           setProjectId(data.project?.id || pid);
           // Rebuild a markdown preview to enable Save button and parity with streamed format
           setFullMarkdown(filesToMarkdown(files));
+          setPhase('generated')
         } else {
           // Still set project id so saving creates version 1
           setProjectId(data.project?.id || pid);
+          setPhase('generated')
         }
       } catch (e) {
         console.error('Failed to load project', e);
@@ -979,16 +1041,103 @@ export default fallbackFunction;`;
       // await storeChatMessage(data.message, 'assistant');
 
       toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
+      // Create a blank project early if none exists to avoid RLS issues on first save
+      try {
+        if (!projectId) {
+          const pres = await fetch(`${BASE_URL}/api/projects`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ title: 'Untitled Project' })
+          });
+          if (pres.ok) {
+            const pdata = await pres.json();
+            if (pdata?.project_id) {
+              setProjectId(pdata.project_id);
+              if (user?.id) {
+                localStorage.setItem(`StudAI:lastProjectId:${user.id}`, pdata.project_id);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Pre-create project failed (non-fatal):', e);
+      }
       return data.session_id;
     } catch (err: any) {
-      const errorMessage = `Error: ${err.message}`;
-
-      // Store error message in history
-      // await storeChatMessage(errorMessage, 'error');
-
-      toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
+      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     }
   };
+
+  const saveProjectIfNeeded = async (): Promise<string | null> => {
+    try {
+      if (!fullMarkdown) return projectId;
+      const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
+      const targetId = projectId || 'new';
+      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+      });
+      if (res.status === 404 && targetId !== 'new') {
+        res = await fetch(`${BASE_URL}/api/projects/new/save`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+        });
+      }
+      if (!res.ok) return projectId;
+      const data = await res.json();
+      if (data.project_id) {
+        setProjectId(data.project_id);
+        if (user?.id) {
+          localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
+        }
+        return data.project_id as string;
+      }
+      return projectId;
+    } catch {
+      return projectId;
+    }
+  }
+
+  const classifyIntent = (text: string): 'edit' | 'fix' => {
+    const hasErrorWords = /(error|exception|traceback|stack|typeerror|referenceerror|cannot\s+read|undefined|failed|crash|stack trace)/i.test(text);
+    const looksLikeStack = /:\s*\d+(:\d+)?/g.test(text) || /at\s+\S+\s*\(/i.test(text);
+    return (hasErrorWords || looksLikeStack) ? 'fix' : 'edit';
+  }
+
+  const applyEditFromChat = async (messageContent: string) => {
+    if (!projectId) {
+      const saved = await saveProjectIfNeeded();
+      if (!saved) throw new Error('Project must be saved before applying edits');
+    }
+    const intent = classifyIntent(messageContent);
+    const tId = toast.loading(intent === 'fix' ? 'Fixing error…' : 'Applying edit…');
+    try {
+      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(intent === 'fix' ? { error: messageContent } : { instructions: messageContent })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      console.log('Edit response', data);
+      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
+      if (arts.length > 0) {
+        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
+        setGeneratedFiles(files);
+        setSandpackKey(Date.now());
+        setFileTree(buildFileTree(files));
+        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
+        setFullMarkdown(filesToMarkdown(files));
+      }
+      toast.update(tId, { render: intent === 'fix' ? `Fix applied (v${data.version})` : `Edit applied (v${data.version})`, type: 'success', isLoading: false, autoClose: 2500 });
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: intent === 'fix' ? 'Applied fix to your reported error.' : 'Applied the requested edits.', timestamp: new Date() }]);
+    } catch (e: any) {
+      toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Edit failed: ${e.message}`, timestamp: new Date() }]);
+    }
+  }
 
   const handleSend = async (prompt?: string) => {
     const messageContent = prompt || input;
@@ -1003,35 +1152,26 @@ export default fallbackFunction;`;
     }]);
     setInput("");
 
-    // Store user message in history
-    // await storeChatMessage(messageContent, 'user');
+    if (phase === 'generated') {
+      // After code generation, route chat to edits/fixes
+      await applyEditFromChat(messageContent);
+      return;
+    }
 
     const loadingToastId = toast.loading("Processing your prompt...");
     try {
-      // Ensure we have a valid session id from backend before refining
-      let activeSessionId = sessionId;
-      if (!activeSessionId) {
-        activeSessionId = await startConversation();
-        // Optionally persist for UX, but do not rely on it for correctness
-        try { localStorage.setItem("sessionid", String(activeSessionId)); } catch { }
-      }
+      let sessionid;
 
-      let res = await fetch(`${BASE_URL}/refine`, {
+      if (!sessionId) {
+        sessionid = await startConversation();
+        localStorage.setItem("sessionid", sessionid)
+      }
+      console.log(sessionid)
+      const res = await fetch(`${BASE_URL}/refine`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ session_id: activeSessionId, message: messageContent }),
+        body: JSON.stringify({ session_id: localStorage.getItem("sessionid"), message: messageContent }),
       });
-
-      // If AI in-memory sessions were reset, recover by starting a new session and retrying once
-      if (res.status === 404) {
-        activeSessionId = await startConversation();
-        try { localStorage.setItem("sessionid", String(activeSessionId)); } catch { }
-        res = await fetch(`${BASE_URL}/refine`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ session_id: activeSessionId, message: messageContent }),
-        });
-      }
 
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
@@ -1061,10 +1201,16 @@ export default fallbackFunction;`;
   };
 
   const handleGenerateCode = async () => {
-    const sessionid = localStorage.getItem("sessionid");
+    // Ensure a session exists or create one on the fly
+    let sessionid = sessionId || localStorage.getItem("sessionid");
     if (!sessionid) {
-      toast.error("No active conversation session");
-      return;
+      sessionid = await startConversation();
+      if (!sessionid) {
+        toast.error("Couldn't start a conversation");
+        return;
+      }
+      localStorage.setItem("sessionid", sessionid);
+      setSessionId(sessionid);
     }
 
     setIsGenerating(true);
@@ -1113,6 +1259,9 @@ export default fallbackFunction;`;
         }
       }
       setFullMarkdown(responseText);
+      // Move into post-generation phase and ensure a project exists for subsequent edits
+      setPhase('generated');
+      await saveProjectIfNeeded();
       toast.update(loadingToastId, { render: "Code generated!", type: "success", isLoading: false, autoClose: 2000 });
     } catch (err: any) {
       const errorMessage = `Error: ${err.message}`;
@@ -1143,14 +1292,6 @@ export default fallbackFunction;`;
         headers: getAuthHeaders(),
         body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
       });
-      // If the project id doesn't exist (e.g., DB was reset), fallback to creating a new project
-      if (res.status === 404) {
-        res = await fetch(`${BASE_URL}/api/projects/new/save`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
-        });
-      }
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.project_id) {
@@ -1165,83 +1306,6 @@ export default fallbackFunction;`;
     }
   };
 
-  const handleApplyEdit = async () => {
-    if (!projectId) {
-      toast.error("Save the project first to enable edits");
-      return;
-    }
-    if (!token) {
-      toast.error("Please sign in");
-      return;
-    }
-    if (!editText.trim()) {
-      toast.error("Enter what you want to change");
-      return;
-    }
-    const tId = toast.loading("Applying edit...");
-    try {
-      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ instructions: editText })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
-      if (arts.length > 0) {
-        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
-        setGeneratedFiles(files);
-        setFileTree(buildFileTree(files));
-        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
-        setFullMarkdown(filesToMarkdown(files));
-      }
-      toast.update(tId, { render: `Edit applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
-    } catch (e: any) {
-      toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
-    }
-  };
-
-  const handleFixError = async () => {
-    if (!projectId) {
-      toast.error("Save the project first to enable fixes");
-      return;
-    }
-    if (!token) {
-      toast.error("Please sign in");
-      return;
-    }
-    // Try latest error from chat messages; fallback to prompt()
-    const lastErrMsg = [...messages].reverse().find(m => m.type === 'error')?.content;
-    let errorText = lastErrMsg || '';
-    if (!errorText) {
-      // eslint-disable-next-line no-alert
-      const manual = window.prompt('Paste the error message to fix:');
-      if (!manual) return;
-      errorText = manual;
-    }
-    const tId = toast.loading("Fixing error...");
-    try {
-      const res = await fetch(`${BASE_URL}/api/projects/${projectId}/edit`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ error: errorText })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
-      if (arts.length > 0) {
-        const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
-        setGeneratedFiles(files);
-        setFileTree(buildFileTree(files));
-        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
-        setFullMarkdown(filesToMarkdown(files));
-      }
-      toast.update(tId, { render: `Fix applied. New version v${data.version}`, type: 'success', isLoading: false, autoClose: 2500 });
-    } catch (e: any) {
-      toast.update(tId, { render: `Fix failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
-    }
-  };
-
   const handleCodeEdit = (newCode: string | undefined) => {
     if (selectedFile && newCode !== undefined) {
       const updatedFiles = generatedFiles.map(file => file.path === selectedFile.path ? { ...file, content: newCode } : file);
@@ -1251,7 +1315,7 @@ export default fallbackFunction;`;
   };
 
   const handleQuickAction = (action: string) => {
-    startConversation().then(() => handleSend(`Create a ${action}`));
+    handleSend(`Create a ${action}`);
   };
 
   const copyCode = () => {
@@ -1522,210 +1586,287 @@ export default fallbackFunction;`;
           </ScrollArea>
         ) : (
           // Chat Interface with Messages
-          <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-            <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-              <div className="h-full flex flex-col">
-                <div className="border-b p-4 flex-shrink-0">
-                  <h2 className="font-semibold flex items-center">
-                    <Sparkles className="mr-2 h-5 w-5 text-primary" />AI Assistant
-                  </h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={handleGenerateCode}
-                    disabled={isGenerating || !sessionId}
-                  >
-                    Generate Code
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="mt-2 ml-2"
-                    onClick={handleSaveProject}
-                    disabled={!fullMarkdown}
-                  >
-                    Save Project
-                  </Button>
-                  <div className="mt-3 space-y-2">
-                    <Textarea
-                      placeholder="Describe an edit (e.g., make shadows darker and background midnight blue)"
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      className="min-h-[64px]"
-                    />
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" onClick={handleApplyEdit} disabled={!projectId}>
-                        <Wand2 className="h-4 w-4 mr-1" /> Apply Edit
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={handleFixError} disabled={!projectId}>
-                        <Bug className="h-4 w-4 mr-1" /> Fix Error
-                      </Button>
+            <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+              {/* ---------- Left Panel (AI Assistant) ---------- */}
+              <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+                <div className="h-full flex flex-col">
+                  {/* Header */}
+                  <div className="border-b p-4 flex-shrink-0">
+                    <h2 className="font-semibold flex items-center">
+                      <Sparkles className="mr-2 h-5 w-5 text-primary" /> AI Assistant
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={handleGenerateCode}
+                      disabled={isGenerating}
+                    >
+                      Generate Code
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="mt-2 ml-2"
+                      onClick={handleSaveProject}
+                      disabled={!fullMarkdown}
+                    >
+                      Save Project
+                    </Button>
+                  </div>
+
+                  {/* Chat Scroll Area */}
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-6">
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${message.type === "user" ? "justify-end" : "justify-start"
+                            }`}
+                        >
+                          <div
+                            className={cn(
+                              "max-w-[80%] rounded-lg p-4",
+                              message.type === "user"
+                                ? "bg-primary text-primary-foreground"
+                                : message.type === "error"
+                                  ? "bg-destructive text-destructive-foreground"
+                                  : "bg-muted text-muted-foreground",
+                              message.loading && "opacity-70"
+                            )}
+                          >
+                            {message.loading ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                <span>Sending...</span>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="whitespace-pre-wrap">{message.content}</p>
+                                <div className="text-xs opacity-70 mt-2">
+                                  {new Date(message.timestamp).toLocaleTimeString()}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {isGenerating && (
+                        <div className="flex justify-start">
+                          <div className="bg-muted text-muted-foreground rounded-lg p-4">
+                            <div className="flex items-center space-x-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                              <span>Generating...</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div ref={messagesEndRef} />
+                  </ScrollArea>
+
+                  {/* Input Area */}
+                  <div className="border-t p-4 flex-shrink-0">
+                    <div className="relative">
+                      <Textarea
+                        placeholder="Describe what to build or modify..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        className={`min-h-[60px] resize-none ${!hasError || isGenerating ? "pr-12" : "pr-36"
+                          }`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSend();
+                          }
+                        }}
+                      />
+                      <div className="absolute bottom-3 right-3 flex flex-row gap-2">
+                        <Button
+                          variant="secondary"
+                          onClick={async () => {
+                            if (lastError.trim()) {
+                              await applyEditFromChat(
+                                `Refine the code to fix the following error:\n${lastError}`
+                              );
+                            }
+                          }}
+                          className={hasError && !isGenerating ? "inline-flex" : "hidden"}
+                          size="sm"
+                        >
+                          <Bug className="h-4 w-4 mr-1" />{" "}
+                          {hasError ? "Fix Error" : "No Errors"}
+                        </Button>
+                        <Button
+                          size="icon"
+                          onClick={handleSend}
+                          disabled={!input.trim() || isGenerating}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </ResizablePanel>
 
-                <div className="flex-1">
-                  <div className="p-4 space-y-6 max-h-screen overflow-y-scroll">
-                    {messages.map((message) => (
-                      <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-                        <div
-                          className={cn(
-                            "max-w-[80%] rounded-lg p-4",
-                            message.type === "user"
-                              ? "bg-primary text-primary-foreground"
-                              : message.type === "error"
-                                ? "bg-destructive text-destructive-foreground"
-                                : "bg-muted text-muted-foreground",
-                            message.loading && "opacity-70"
-                          )}
-                        >
-                          {message.loading ? (
-                            <div className="flex items-center space-x-2">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                              <span>Sending...</span>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="whitespace-pre-wrap">{message.content}</p>
-                              <div className="text-xs opacity-70 mt-2">
-                                {new Date(message.timestamp).toLocaleTimeString()}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+              <ResizableHandle withHandle />
 
-                    {isGenerating && (
-                      <div className="flex justify-start">
-                        <div className="bg-muted text-muted-foreground rounded-lg p-4">
-                          <div className="flex items-center space-x-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                            <span>Generating...</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div ref={messagesEndRef} />
-                </div>
-
-                <div className="border-t p-4 flex-shrink-0">
-                  <div className="relative">
-                    <Textarea
-                      placeholder="Describe what to build or modify..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      className="min-h-[60px] resize-none pr-12"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                    />
-                    <Button
-                      size="icon"
-                      className="absolute bottom-3 right-3"
-                      onClick={() => handleSend()}
-                      disabled={!input.trim() || isGenerating}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </ResizablePanel>
-
-            <ResizableHandle withHandle />
-
-            <ResizablePanel defaultSize={70} minSize={30}>
-              <div className="h-full flex flex-col">
-                <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex-1 flex flex-col min-h-0">
-                  <div className="border-b p-2 flex items-center justify-between flex-shrink-0">
-                    <TabsList>
-                      <TabsTrigger value="code"><Code className="mr-2 h-4 w-4" />Code</TabsTrigger>
-                      <TabsTrigger value="preview"><Eye className="mr-2 h-4 w-4" />Preview</TabsTrigger>
-                    </TabsList>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm" onClick={copyCode} disabled={!selectedFile}><Copy className="mr-2 h-4 w-4" />Copy</Button>
-                      <Button variant="outline" size="sm" onClick={downloadZip} disabled={generatedFiles.length === 0}><Download className="mr-2 h-4 w-4" />Download ZIP</Button>
-                      {selectedTab === 'preview' && sandpackConfig.files && Object.keys(sandpackConfig.files).length > 0 && (
+              {/* ---------- Right Panel (Code & Preview) ---------- */}
+              <ResizablePanel defaultSize={70} minSize={30}>
+                <div className="h-full flex flex-col">
+                  <Tabs
+                    value={selectedTab}
+                    onValueChange={setSelectedTab}
+                    className="flex-1 flex flex-col min-h-0"
+                  >
+                    {/* Tabs Header */}
+                    <div className="border-b p-2 flex items-center justify-between flex-shrink-0">
+                      <TabsList>
+                        <TabsTrigger value="code">
+                          <Code className="mr-2 h-4 w-4" />
+                          Code
+                        </TabsTrigger>
+                        <TabsTrigger value="preview">
+                          <Eye className="mr-2 h-4 w-4" />
+                          Preview
+                        </TabsTrigger>
+                      </TabsList>
+                      <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={openInCodeSandbox}
+                          onClick={copyCode}
+                          disabled={!selectedFile}
                         >
-                          <Globe className="mr-2 h-4 w-4" />Open in CodeSandbox
+                          <Copy className="mr-2 h-4 w-4" />
+                          Copy
                         </Button>
-                      )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={downloadZip}
+                          disabled={generatedFiles.length === 0}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download ZIP
+                        </Button>
+                        {selectedTab === "preview" &&
+                          sandpackConfig.files &&
+                          Object.keys(sandpackConfig.files).length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={openInCodeSandbox}
+                            >
+                              <Globe className="mr-2 h-4 w-4" />
+                              Open in CodeSandbox
+                            </Button>
+                          )}
+                      </div>
                     </div>
-                  </div>
 
-                  <TabsContent value="code" className="flex-1 flex flex-col min-h-0">
-                    <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
-                        <div className="h-full border-r bg-muted/20 flex flex-col min-h-0">
-                          <div className="p-2 border-b flex-shrink-0"><h3 className="font-semibold text-sm">File Explorer</h3></div>
-                          <ScrollArea className="flex-1 p-2 min-h-0">
-                            {fileTree.length > 0 ? (
-                              <div className="space-y-1">{fileTree.map((node) => (<FileTreeItem key={node.path} node={node} />))}</div>
-                            ) : (
-                              <div className="text-center py-8 text-muted-foreground text-sm">
-                                <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                <p>Awaiting generation...</p>
-                              </div>
-                            )}
-                          </ScrollArea>
-                        </div>
-                      </ResizablePanel>
-                      <ResizableHandle withHandle />
-                      <ResizablePanel defaultSize={75}>
-                        <div className="h-full min-h-0">
-                          <Editor
-                            height="100%"
-                            language={selectedFile ? getLanguage(selectedFile.path) : 'plaintext'}
-                            value={selectedFile?.content ?? "// Select a file to view and edit its content"}
-                            theme={theme === 'dark' ? 'vs-dark' : 'light'}
-                            onChange={handleCodeEdit}
-                            options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14, scrollBeyondLastLine: false }}
+                    {/* Code Editor Tab */}
+                    <TabsContent value="code" className="flex-1 flex flex-col min-h-0">
+                      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+                        {/* File Explorer */}
+                        <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                          <div className="h-full border-r bg-muted/20 flex flex-col min-h-0">
+                            <div className="p-2 border-b flex-shrink-0">
+                              <h3 className="font-semibold text-sm">File Explorer</h3>
+                            </div>
+                            <ScrollArea className="flex-1 p-2 min-h-0">
+                              {fileTree.length > 0 ? (
+                                <div className="space-y-1">
+                                  {fileTree.map((node) => (
+                                    <FileTreeItem key={node.path} node={node} />
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-8 text-muted-foreground text-sm">
+                                  <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <p>Awaiting generation...</p>
+                                </div>
+                              )}
+                            </ScrollArea>
+                          </div>
+                        </ResizablePanel>
+
+                        <ResizableHandle withHandle />
+
+                        {/* Code Editor */}
+                        <ResizablePanel defaultSize={75}>
+                          <div className="h-full min-h-0">
+                            <Editor
+                              height="100%"
+                              language={
+                                selectedFile ? getLanguage(selectedFile.path) : "plaintext"
+                              }
+                              value={
+                                selectedFile?.content ??
+                                "// Select a file to view and edit its content"
+                              }
+                              theme={theme === "dark" ? "vs-dark" : "light"}
+                              onChange={handleCodeEdit}
+                              options={{
+                                minimap: { enabled: false },
+                                wordWrap: "on",
+                                fontSize: 14,
+                                scrollBeyondLastLine: false,
+                              }}
+                            />
+                          </div>
+                        </ResizablePanel>
+                      </ResizablePanelGroup>
+                    </TabsContent>
+
+                    {/* Preview Tab */}
+                    <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
+                      {selectedTab === "preview" && (
+                        <SandpackProvider
+                          key={sandpackKey}
+                          files={sandpackConfig.files}
+                          template="react-ts"
+                          customSetup={{
+                            entry: sandpackConfig.entry,
+                            dependencies: {
+                              react: "^18.2.0",
+                              "react-dom": "^18.2.0",
+                              "react-router-dom": "^6.22.3",
+                              tailwindcss: "^3.4.1",
+                              axios: "^1.11.0",
+                              "react-icons": "^5.5.0",
+                              zustand: "^5.0.0",
+                              "date-fns": "^1.0.0",
+                            },
+                          }}
+                        >
+                          <ErrorListener
+                            onErrorChange={handleErrorChange}
+                            onFix={(errorMessage: string) => {
+                              console.error("Fix handler not implemented", errorMessage);
+                            }}
                           />
-                        </div>
-                      </ResizablePanel>
-                    </ResizablePanelGroup>
-                  </TabsContent>
+                          <SandpackLayout
+                            style={{ height: "100%", minHeight: 0 }}
+                            className="flex-1 min-h-0"
+                          >
+                            <SandpackCodeEditor
+                              style={{ height: "calc(100vh - 240px)" }}
+                            />
+                            <SandpackPreview
+                              style={{ height: "calc(100vh - 240px)" }}
+                            />
+                          </SandpackLayout>
+                        </SandpackProvider>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
 
-                  <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
-                    {selectedTab === 'preview' && (
-                      <SandpackProvider
-                        files={sandpackConfig.files}
-                        template="react-ts"
-                        customSetup={{
-                          entry: sandpackConfig.entry,
-                          dependencies: {
-                            'react': "^18.2.0",
-                            "react-dom": "^18.2.0",
-                            "react-router-dom": "^6.22.3",
-                            'tailwindcss': "^3.4.1",
-                            'axios': "^1.11.0",
-                            "react-icons": "^5.5.0",
-                            "zustand": "^5.0.0",
-                            "date-fns": "^1.0.0"
-                          }
-                        }}
-                      >
-                        <SandpackLayout style={{ height: "100%", minHeight: 0 }} className="flex-1 min-h-0">
-                          {/* <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} /> */}
-                          <SandpackPreview style={{ height: "calc(100vh - 240px)" }} />
-                        </SandpackLayout>
-                      </SandpackProvider>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
         )}
       </main>
     </div>

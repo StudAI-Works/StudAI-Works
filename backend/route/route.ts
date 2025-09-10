@@ -4,41 +4,57 @@ import multer from "multer";
 import axios from "axios";
 import { Readable } from "stream";
 import { SignUpUser, SignInUser } from "../controllers/authController";
-import {
-  saveGeneratedOutput,
-  listProjects,
-  getProjectDetail,
-  editProject,
-} from "../controllers/projectsController";
+import { saveGeneratedOutput, listProjects, getProjectDetail, editProject, deleteProject, createBlankProject } from "../controllers/projectsController";
 import { updateProfile, updateAvatar, getProfile } from "../controllers/profileController";
 import Allusers from "../controllers/AllUsers";
 import { protect } from "../middleware/authMiddleware";
-import {
-  storeGeneratedFile,
-  storeChatMessage,
-  getFileHistory,
-  getChatHistory,
-  deleteGeneratedFile,
-} from "../controllers/historyController";
-
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import client from "../src/lib/azureOpenAI";
+import systemPrompt  from "../route/prompt";
 const router: Router = Router();
 
-// FastAPI base URL configuration
+// Prefer FASTAPI_URL, else construct from HOST and PORT
 const RAW_FASTAPI_URL = process.env.FASTAPI_URL;
 const FASTAPI_HOST = process.env.FASTAPI_HOST || "localhost";
 const FASTAPI_PORT = process.env.FASTAPI_PORT || "8000";
-// const FAST_API = RAW_FASTAPI_URL?.replace(/\/$/, "") || `http://${FASTAPI_HOST.replace(/\/$/, "")}:${FASTAPI_PORT}`;
-let FAST_API = process.env.FASTAPI_URL;
+const FAST_API = process.env.FASTAPI_URL
 
-console.log(FAST_API)
+// Auth gating flags (default to off in non-production)
+const REQUIRE_AUTH_GENERATE = (() => {
+  const v = process.env.REQUIRE_AUTH_GENERATE;
+  if (v != null) return v.toLowerCase() !== "false";
+  return process.env.NODE_ENV === "production";
+})();
+
+const REQUIRE_AUTH_PROJECTS = (() => {
+  const v = process.env.REQUIRE_AUTH_PROJECTS;
+  if (v != null) return v.toLowerCase() !== "false";
+  return process.env.NODE_ENV === "production";
+})();
+
+const maybeProtect = (req: Request, res: Response, next: NextFunction) => {
+  if (!REQUIRE_AUTH_GENERATE) return next();
+  return (protect as any)(req, res, next);
+};
+
+const maybeProtectProjects = (req: Request, res: Response, next: NextFunction) => {
+  // If auth is required, always protect
+  if (REQUIRE_AUTH_PROJECTS) return (protect as any)(req, res, next);
+  // If not required but a bearer token is provided, populate req.user for ownership
+  const authz = req.headers?.authorization || '';
+  if (typeof authz === 'string' && /^Bearer\s+\S+/.test(authz)) {
+    return (protect as any)(req, res, next);
+  }
+  return next();
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 // Public routes
-router.get("/", (_req: Request, res: Response): void => {
-  console.log(FAST_API)
+router.get("/", (_req: Request, res: Response) => {
   res.send("Welcome to StudAI Backend");
 });
 router.post("/signup", SignUpUser);
@@ -52,7 +68,6 @@ router.get("/allusers", protect, Allusers);
 
 // Conversational AI routes
 router.post("/start-conversation", async (_req: Request, res: Response): Promise<void> => {
-  console.log(FAST_API)
   try {
     const response = await axios.post(`${FAST_API}/start-conversation`);
     res.status(200).json(response.data);
@@ -64,7 +79,6 @@ router.post("/start-conversation", async (_req: Request, res: Response): Promise
 
 // Refine feature
 const handleRefine = async (req: Request, res: Response): Promise<void> => {
-  console.log(FAST_API)
   const { session_id, message } = req.body;
   if (!session_id || !message) {
     res.status(400).json({ error: "session_id and message are required" });
@@ -75,44 +89,19 @@ const handleRefine = async (req: Request, res: Response): Promise<void> => {
     res.status(200).json(response.data);
   } catch (error: any) {
     console.error("Error refining features:", error.message);
-    res.status(error.response?.status || 500).json({ error: error.message || "Failed to refine features", upstream: error.response?.data });
+    const status = error.response?.status || 500;
+    const upstream = error.response?.data;
+    res.status(status).json({ error: "Failed to refine", upstream });
   }
 };
+
+// router.post("/api/refine", handleRefine);
+
+// Backward-compatible alias
 router.post("/refine", handleRefine);
 
-// History routes
-router.get("/history/chat", protect, getChatHistory);
-router.post("/history/chat", protect, storeChatMessage);
-router.get("/history/files", protect, getFileHistory);
-router.post("/history/files", protect, storeGeneratedFile);
-router.delete("/history/files/:fileId", protect, deleteGeneratedFile);
-
-// Auth flags for generation & projects
-const REQUIRE_AUTH_GENERATE = (process.env.REQUIRE_AUTH_GENERATE || "true").toLowerCase() !== "false";
-const REQUIRE_AUTH_PROJECTS = (process.env.REQUIRE_AUTH_PROJECTS || "true").toLowerCase() !== "false";
-
-const maybeProtect = (req: Request, res: Response, next: NextFunction) => {
-  
-  if (!REQUIRE_AUTH_GENERATE) return next();
-  protect(req, res, next);
-};
-
-const maybeProtectProjects = (req: Request, res: Response, next: NextFunction): void => {
-  if (REQUIRE_AUTH_PROJECTS) {
-    protect(req, res, next);
-    return;
-  }
-  const authz = req.headers?.authorization || "";
-  if (typeof authz === "string" && /^Bearer\s+\S+/.test(authz)) {
-    protect(req, res, next);
-    return;
-  }
-  next();
-};
-
-// Generate route with stream
-router.post("/api/generate", async (req: Request, res: Response): Promise<void> => {
-  console.log(req.body)
+// Generate (SSE proxy)
+router.post("/api/generate", maybeProtect, async (req: Request, res: Response): Promise<void> => {
   const { session_id } = req.body;
   if (!session_id) {
     res.status(400).json({ error: "session_id is required" });
@@ -123,24 +112,23 @@ router.post("/api/generate", async (req: Request, res: Response): Promise<void> 
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const response = await axios({
+    const response = (await axios({
       method: "post",
       url: `${FAST_API}/generate`,
       data: { session_id },
       responseType: "stream",
-    });
+    })) as unknown as { data: Readable };
 
-    const stream = response.data as unknown as Readable;
-    stream.pipe(res);
+    response.data.pipe(res);
 
-    stream.on("error", (error: any) => {
+    response.data.on("error", (error: any) => {
       console.error("Streaming error:", error.message);
       res.write(`data: Error: ${error.message}\n\n`);
       res.end();
     });
 
     req.on("close", () => {
-      stream.destroy();
+      response.data.destroy();
       console.log("Client disconnected, stream closed");
     });
   } catch (error: any) {
@@ -149,16 +137,16 @@ router.post("/api/generate", async (req: Request, res: Response): Promise<void> 
   }
 });
 
-// GET /api/generate guidance
-// router.get("/generate", (_req: Request, res: Response): void => {
-//   res.status(405).json({
-//     error: "Method Not Allowed",
-//     message: "Use POST /api/generate with JSON body { session_id } and Authorization bearer token.",
-//     example: { session_id: "<session-id>" },
-//   });
-// });
+// Helpful guidance for accidental GET requests
+router.get("/api/generate", (_req: Request, res: Response): void => {
+  res.status(405).json({
+    error: "Method Not Allowed",
+    message: "Use POST /api/generate with JSON body { session_id }.",
+    example: { session_id: "<session-id>" },
+  });
+});
 
-// AI health check
+// AI health: check connectivity
 router.get("/api/ai/health", async (_req: Request, res: Response): Promise<void> => {
   try {
     const { data } = await axios.get(`${FAST_API}/`);
@@ -168,10 +156,51 @@ router.get("/api/ai/health", async (_req: Request, res: Response): Promise<void>
   }
 });
 
-// Project routes - reordered with more specific routes first
+// Quick config endpoint to see auth gating flags (dev aid)
+router.get("/api/config", (_req: Request, res: Response): void => {
+  res.status(200).json({
+    REQUIRE_AUTH_GENERATE,
+    REQUIRE_AUTH_PROJECTS,
+    FAST_API,
+  });
+});
+
+// Project routes
 router.post("/api/projects/:id/save", maybeProtectProjects, saveGeneratedOutput);
 router.post("/api/projects/:id/edit", maybeProtectProjects, editProject);
-router.get("/api/projects/:id", maybeProtectProjects, getProjectDetail);
 router.get("/api/projects", maybeProtectProjects, listProjects);
+router.get("/api/projects/:id", maybeProtectProjects, getProjectDetail);
+router.delete("/api/projects/:id", maybeProtectProjects, deleteProject);
+router.post("/api/projects", maybeProtectProjects, createBlankProject);
+
+
+const convHistory: ChatCompletionMessageParam[] = [
+  { role: "system", content: "" },
+];
+router.post("/chatbot", async (req, res) => {
+  console.log("Chatbot request received:", req.body);
+    const { prompt,url } = req.body;
+    convHistory.push({ role: "user", content: prompt });
+try {
+  const response = await client.chat.completions.create({
+  model: process.env.AZURE_OPENAI_DEPLOYMENT_NAME!,
+  messages: [
+    { role: "system", content: systemPrompt+ `\n\nCurrent URL of the user is: ${url}` },
+    ...convHistory.slice(-10)
+  ],
+  temperature: 0.7,
+  max_tokens: 1000,
+});
+  console.log("OpenAI response:", response);
+  convHistory.push({ role: "assistant", content: response.choices[0].message.content || "" });
+    const botResponse = response.choices[0].message.content;
+  console.log("Bot response:", botResponse);
+    res.json({ response: botResponse });
+} catch (err) {
+  console.error("OpenAI API Error:", err);
+}
+});
+
+// Legacy route removed: use /api/start-conversation, /api/refine, and /api/generate instead.
 
 export default router;
