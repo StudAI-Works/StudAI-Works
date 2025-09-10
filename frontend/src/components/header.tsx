@@ -54,13 +54,6 @@ export function Header({ user, onLogout }: HeaderProps) {
               >
                 Projects
               </Link>
-              <Link
-                to="/organization"
-                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/organization" ? "text-primary" : "text-muted-foreground"
-                  }`}
-              >
-                Organization
-              </Link>
             </nav>
           )}
         </div>

@@ -9,7 +9,6 @@ const navigation = [
   { name: "Home", href: "/dashboard", icon: Home },
   { name: "Generate", href: "/generate", icon: Sparkles },
   { name: "Projects", href: "/dashboard", icon: FolderOpen },
-  { name: "Organization", href: "/organization", icon: Building },
   { name: "Account Settings", href: "/account", icon: Settings },
   { name: "Help & Support", href: "/help", icon: HelpCircle },
 ]

@@ -22,7 +22,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor, useSandpack, useSandpackConsole } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
@@ -68,7 +68,7 @@ const ErrorListener = ({
   useEffect(() => {
     const errorMessages = logs
       .filter((log) => log.method === "error" && Array.isArray(log.data) && log.data.length > 0)
-      .flatMap((log) => log.data.map(e => (e instanceof Error ? e.message : String(e))));
+      .flatMap((log) => (log.data || []).map(e => (e instanceof Error ? e.message : String(e))));
 
     const foundError = errorMessages.length > 0;
 
@@ -177,13 +177,13 @@ export default function GeneratePage() {
 
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
-const [hasError, setHasError] = useState(false);
-const [lastError, setLastError] = useState<string>("");
+  const [hasError, setHasError] = useState(false);
+  const [lastError, setLastError] = useState<string>("");
 
-const handleErrorChange = useCallback((hasError: boolean, errorMessage: string | null) => {
-  setHasError(hasError);
-  setLastError(errorMessage || "");
-}, [hasError, lastError]);
+  const handleErrorChange = useCallback((hasError: boolean, errorMessage: string | null) => {
+    setHasError(hasError);
+    setLastError(errorMessage || "");
+  }, [hasError, lastError]);
 
   // Allow overriding backend URL via Vite env, fallback to localhost
   const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
@@ -1586,286 +1586,286 @@ export default fallbackFunction;`;
           </ScrollArea>
         ) : (
           // Chat Interface with Messages
-            <ResizablePanelGroup direction="horizontal" className="h-full w-full">
-              {/* ---------- Left Panel (AI Assistant) ---------- */}
-              <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-                <div className="h-full flex flex-col">
-                  {/* Header */}
-                  <div className="border-b p-4 flex-shrink-0">
-                    <h2 className="font-semibold flex items-center">
-                      <Sparkles className="mr-2 h-5 w-5 text-primary" /> AI Assistant
-                    </h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={handleGenerateCode}
-                      disabled={isGenerating}
-                    >
-                      Generate Code
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="mt-2 ml-2"
-                      onClick={handleSaveProject}
-                      disabled={!fullMarkdown}
-                    >
-                      Save Project
-                    </Button>
-                  </div>
+          <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+            {/* ---------- Left Panel (AI Assistant) ---------- */}
+            <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+              <div className="h-full flex flex-col">
+                {/* Header */}
+                <div className="border-b p-4 flex-shrink-0">
+                  <h2 className="font-semibold flex items-center">
+                    <Sparkles className="mr-2 h-5 w-5 text-primary" /> AI Assistant
+                  </h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={handleGenerateCode}
+                    disabled={isGenerating}
+                  >
+                    Generate Code
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="mt-2 ml-2"
+                    onClick={handleSaveProject}
+                    disabled={!fullMarkdown}
+                  >
+                    Save Project
+                  </Button>
+                </div>
 
-                  {/* Chat Scroll Area */}
-                  <ScrollArea className="flex-1">
-                    <div className="p-4 space-y-6">
-                      {messages.map((message) => (
+                {/* Chat Scroll Area */}
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-6">
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`flex ${message.type === "user" ? "justify-end" : "justify-start"
+                          }`}
+                      >
                         <div
-                          key={message.id}
-                          className={`flex ${message.type === "user" ? "justify-end" : "justify-start"
-                            }`}
+                          className={cn(
+                            "max-w-[80%] rounded-lg p-4",
+                            message.type === "user"
+                              ? "bg-primary text-primary-foreground"
+                              : message.type === "error"
+                                ? "bg-destructive text-destructive-foreground"
+                                : "bg-muted text-muted-foreground",
+                            message.loading && "opacity-70"
+                          )}
                         >
-                          <div
-                            className={cn(
-                              "max-w-[80%] rounded-lg p-4",
-                              message.type === "user"
-                                ? "bg-primary text-primary-foreground"
-                                : message.type === "error"
-                                  ? "bg-destructive text-destructive-foreground"
-                                  : "bg-muted text-muted-foreground",
-                              message.loading && "opacity-70"
-                            )}
-                          >
-                            {message.loading ? (
-                              <div className="flex items-center space-x-2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                                <span>Sending...</span>
-                              </div>
-                            ) : (
-                              <>
-                                <p className="whitespace-pre-wrap">{message.content}</p>
-                                <div className="text-xs opacity-70 mt-2">
-                                  {new Date(message.timestamp).toLocaleTimeString()}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-
-                      {isGenerating && (
-                        <div className="flex justify-start">
-                          <div className="bg-muted text-muted-foreground rounded-lg p-4">
+                          {message.loading ? (
                             <div className="flex items-center space-x-2">
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                              <span>Generating...</span>
+                              <span>Sending...</span>
                             </div>
+                          ) : (
+                            <>
+                              <p className="whitespace-pre-wrap">{message.content}</p>
+                              <div className="text-xs opacity-70 mt-2">
+                                {new Date(message.timestamp).toLocaleTimeString()}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {isGenerating && (
+                      <div className="flex justify-start">
+                        <div className="bg-muted text-muted-foreground rounded-lg p-4">
+                          <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                            <span>Generating...</span>
                           </div>
                         </div>
-                      )}
-                    </div>
-                    <div ref={messagesEndRef} />
-                  </ScrollArea>
+                      </div>
+                    )}
+                  </div>
+                  <div ref={messagesEndRef} />
+                </ScrollArea>
 
-                  {/* Input Area */}
-                  <div className="border-t p-4 flex-shrink-0">
-                    <div className="relative">
-                      <Textarea
-                        placeholder="Describe what to build or modify..."
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        className={`min-h-[60px] resize-none ${!hasError || isGenerating ? "pr-12" : "pr-36"
-                          }`}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSend();
+                {/* Input Area */}
+                <div className="border-t p-4 flex-shrink-0">
+                  <div className="relative">
+                    <Textarea
+                      placeholder="Describe what to build or modify..."
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      className={`min-h-[60px] resize-none ${!hasError || isGenerating ? "pr-12" : "pr-36"
+                        }`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                    />
+                    <div className="absolute bottom-3 right-3 flex flex-row gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={async () => {
+                          if (lastError.trim()) {
+                            await applyEditFromChat(
+                              `Refine the code to fix the following error:\n${lastError}`
+                            );
                           }
                         }}
-                      />
-                      <div className="absolute bottom-3 right-3 flex flex-row gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={async () => {
-                            if (lastError.trim()) {
-                              await applyEditFromChat(
-                                `Refine the code to fix the following error:\n${lastError}`
-                              );
-                            }
-                          }}
-                          className={hasError && !isGenerating ? "inline-flex" : "hidden"}
-                          size="sm"
-                        >
-                          <Bug className="h-4 w-4 mr-1" />{" "}
-                          {hasError ? "Fix Error" : "No Errors"}
-                        </Button>
-                        <Button
-                          size="icon"
-                          onClick={handleSend}
-                          disabled={!input.trim() || isGenerating}
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        className={hasError && !isGenerating ? "inline-flex" : "hidden"}
+                        size="sm"
+                      >
+                        <Bug className="h-4 w-4 mr-1" />{" "}
+                        {hasError ? "Fix Error" : "No Errors"}
+                      </Button>
+                      <Button
+                        size="icon"
+                        onClick={() => handleSend()}
+                        disabled={!input.trim() || isGenerating}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
-              </ResizablePanel>
+              </div>
+            </ResizablePanel>
 
-              <ResizableHandle withHandle />
+            <ResizableHandle withHandle />
 
-              {/* ---------- Right Panel (Code & Preview) ---------- */}
-              <ResizablePanel defaultSize={70} minSize={30}>
-                <div className="h-full flex flex-col">
-                  <Tabs
-                    value={selectedTab}
-                    onValueChange={setSelectedTab}
-                    className="flex-1 flex flex-col min-h-0"
-                  >
-                    {/* Tabs Header */}
-                    <div className="border-b p-2 flex items-center justify-between flex-shrink-0">
-                      <TabsList>
-                        <TabsTrigger value="code">
-                          <Code className="mr-2 h-4 w-4" />
-                          Code
-                        </TabsTrigger>
-                        <TabsTrigger value="preview">
-                          <Eye className="mr-2 h-4 w-4" />
-                          Preview
-                        </TabsTrigger>
-                      </TabsList>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={copyCode}
-                          disabled={!selectedFile}
-                        >
-                          <Copy className="mr-2 h-4 w-4" />
-                          Copy
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={downloadZip}
-                          disabled={generatedFiles.length === 0}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Download ZIP
-                        </Button>
-                        {selectedTab === "preview" &&
-                          sandpackConfig.files &&
-                          Object.keys(sandpackConfig.files).length > 0 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={openInCodeSandbox}
-                            >
-                              <Globe className="mr-2 h-4 w-4" />
-                              Open in CodeSandbox
-                            </Button>
-                          )}
-                      </div>
+            {/* ---------- Right Panel (Code & Preview) ---------- */}
+            <ResizablePanel defaultSize={70} minSize={30}>
+              <div className="h-full flex flex-col">
+                <Tabs
+                  value={selectedTab}
+                  onValueChange={setSelectedTab}
+                  className="flex-1 flex flex-col min-h-0"
+                >
+                  {/* Tabs Header */}
+                  <div className="border-b p-2 flex items-center justify-between flex-shrink-0">
+                    <TabsList>
+                      <TabsTrigger value="code">
+                        <Code className="mr-2 h-4 w-4" />
+                        Code
+                      </TabsTrigger>
+                      <TabsTrigger value="preview">
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview
+                      </TabsTrigger>
+                    </TabsList>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyCode}
+                        disabled={!selectedFile}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={downloadZip}
+                        disabled={generatedFiles.length === 0}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download ZIP
+                      </Button>
+                      {selectedTab === "preview" &&
+                        sandpackConfig.files &&
+                        Object.keys(sandpackConfig.files).length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={openInCodeSandbox}
+                          >
+                            <Globe className="mr-2 h-4 w-4" />
+                            Open in CodeSandbox
+                          </Button>
+                        )}
                     </div>
+                  </div>
 
-                    {/* Code Editor Tab */}
-                    <TabsContent value="code" className="flex-1 flex flex-col min-h-0">
-                      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-                        {/* File Explorer */}
-                        <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
-                          <div className="h-full border-r bg-muted/20 flex flex-col min-h-0">
-                            <div className="p-2 border-b flex-shrink-0">
-                              <h3 className="font-semibold text-sm">File Explorer</h3>
-                            </div>
-                            <ScrollArea className="flex-1 p-2 min-h-0">
-                              {fileTree.length > 0 ? (
-                                <div className="space-y-1">
-                                  {fileTree.map((node) => (
-                                    <FileTreeItem key={node.path} node={node} />
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-center py-8 text-muted-foreground text-sm">
-                                  <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                  <p>Awaiting generation...</p>
-                                </div>
-                              )}
-                            </ScrollArea>
+                  {/* Code Editor Tab */}
+                  <TabsContent value="code" className="flex-1 flex flex-col min-h-0">
+                    <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+                      {/* File Explorer */}
+                      <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+                        <div className="h-full border-r bg-muted/20 flex flex-col min-h-0">
+                          <div className="p-2 border-b flex-shrink-0">
+                            <h3 className="font-semibold text-sm">File Explorer</h3>
                           </div>
-                        </ResizablePanel>
+                          <ScrollArea className="flex-1 p-2 min-h-0">
+                            {fileTree.length > 0 ? (
+                              <div className="space-y-1">
+                                {fileTree.map((node) => (
+                                  <FileTreeItem key={node.path} node={node} />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8 text-muted-foreground text-sm">
+                                <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p>Awaiting generation...</p>
+                              </div>
+                            )}
+                          </ScrollArea>
+                        </div>
+                      </ResizablePanel>
 
-                        <ResizableHandle withHandle />
+                      <ResizableHandle withHandle />
 
-                        {/* Code Editor */}
-                        <ResizablePanel defaultSize={75}>
-                          <div className="h-full min-h-0">
-                            <Editor
-                              height="100%"
-                              language={
-                                selectedFile ? getLanguage(selectedFile.path) : "plaintext"
-                              }
-                              value={
-                                selectedFile?.content ??
-                                "// Select a file to view and edit its content"
-                              }
-                              theme={theme === "dark" ? "vs-dark" : "light"}
-                              onChange={handleCodeEdit}
-                              options={{
-                                minimap: { enabled: false },
-                                wordWrap: "on",
-                                fontSize: 14,
-                                scrollBeyondLastLine: false,
-                              }}
-                            />
-                          </div>
-                        </ResizablePanel>
-                      </ResizablePanelGroup>
-                    </TabsContent>
-
-                    {/* Preview Tab */}
-                    <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
-                      {selectedTab === "preview" && (
-                        <SandpackProvider
-                          key={sandpackKey}
-                          files={sandpackConfig.files}
-                          template="react-ts"
-                          customSetup={{
-                            entry: sandpackConfig.entry,
-                            dependencies: {
-                              react: "^18.2.0",
-                              "react-dom": "^18.2.0",
-                              "react-router-dom": "^6.22.3",
-                              tailwindcss: "^3.4.1",
-                              axios: "^1.11.0",
-                              "react-icons": "^5.5.0",
-                              zustand: "^5.0.0",
-                              "date-fns": "^1.0.0",
-                            },
-                          }}
-                        >
-                          <ErrorListener
-                            onErrorChange={handleErrorChange}
-                            onFix={(errorMessage: string) => {
-                              console.error("Fix handler not implemented", errorMessage);
+                      {/* Code Editor */}
+                      <ResizablePanel defaultSize={75}>
+                        <div className="h-full min-h-0">
+                          <Editor
+                            height="100%"
+                            language={
+                              selectedFile ? getLanguage(selectedFile.path) : "plaintext"
+                            }
+                            value={
+                              selectedFile?.content ??
+                              "// Select a file to view and edit its content"
+                            }
+                            theme={theme === "dark" ? "vs-dark" : "light"}
+                            onChange={handleCodeEdit}
+                            options={{
+                              minimap: { enabled: false },
+                              wordWrap: "on",
+                              fontSize: 14,
+                              scrollBeyondLastLine: false,
                             }}
                           />
-                          <SandpackLayout
-                            style={{ height: "100%", minHeight: 0 }}
-                            className="flex-1 min-h-0"
-                          >
-                            <SandpackCodeEditor
-                              style={{ height: "calc(100vh - 240px)" }}
-                            />
-                            <SandpackPreview
-                              style={{ height: "calc(100vh - 240px)" }}
-                            />
-                          </SandpackLayout>
-                        </SandpackProvider>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
+                        </div>
+                      </ResizablePanel>
+                    </ResizablePanelGroup>
+                  </TabsContent>
+
+                  {/* Preview Tab */}
+                  <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
+                    {selectedTab === "preview" && (
+                      <SandpackProvider
+                        key={sandpackKey}
+                        files={sandpackConfig.files}
+                        template="react-ts"
+                        customSetup={{
+                          entry: sandpackConfig.entry,
+                          dependencies: {
+                            react: "^18.2.0",
+                            "react-dom": "^18.2.0",
+                            "react-router-dom": "^6.22.3",
+                            tailwindcss: "^3.4.1",
+                            axios: "^1.11.0",
+                            "react-icons": "^5.5.0",
+                            zustand: "^5.0.0",
+                            "date-fns": "^1.0.0",
+                          },
+                        }}
+                      >
+                        <ErrorListener
+                          onErrorChange={handleErrorChange}
+                          onFix={(errorMessage: string) => {
+                            console.error("Fix handler not implemented", errorMessage);
+                          }}
+                        />
+                        <SandpackLayout
+                          style={{ height: "100%", minHeight: 0 }}
+                          className="flex-1 min-h-0"
+                        >
+                          <SandpackCodeEditor
+                            style={{ height: "calc(100vh - 240px)" }}
+                          />
+                          <SandpackPreview
+                            style={{ height: "calc(100vh - 240px)" }}
+                          />
+                        </SandpackLayout>
+                      </SandpackProvider>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
 
         )}
       </main>

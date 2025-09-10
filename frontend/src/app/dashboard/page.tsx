@@ -11,7 +11,7 @@ import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder, Refres
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/dashboard-sidebar";
 import { useAuth } from "../context/authContext";
-import { HistoryPanel } from "@/components/HistoryPanel";
+// import { HistoryPanel } from "@/components/HistoryPanel";
 
 type ProjectItem = {
   id: string;
@@ -195,7 +195,7 @@ export default function DashboardPage() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery ? "Try adjusting your search terms" : "Create your first project to get started"}
                 </p>
-                <Link to="/generate">
+                <Link to="/editorpage">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Create New Project

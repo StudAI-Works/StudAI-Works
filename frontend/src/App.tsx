@@ -9,7 +9,6 @@ import AccountPage from './app/account/page';
 import EditorPage from './app/editor/page';
 import GeneratePage from './app/generate/page';
 import HelpPage from './app/help/page';
-import OrganizationPage from './app/organization/page';
 
 // Import Providers and Guards
 import { AuthProvider } from './app/context/authContext';
@@ -17,7 +16,6 @@ import { ThemeProvider } from './components/theme-provider';
 import ProtectedRoute from './components/protectedRoute';
 import PublicRoute from './components/publicRoutes';
 import Admin from './app/account/admin';
-import { ChatWidget } from './components/chat-widget';
 function App() {
   return (
     // --- WRAP EVERYTHING IN THE THEME PROVIDER ---
@@ -43,13 +41,11 @@ function App() {
               <Route path='/help' element={<HelpPage />} />
               <Route path='/studaiadmin' element={<Admin/>} />
               
-              <Route path='/organization' element={<OrganizationPage />} />
             </Route>
             <Route path='*' element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
-      {/* <ChatWidget/> */}
     </ThemeProvider>
   );
 }
