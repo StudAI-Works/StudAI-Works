@@ -168,36 +168,6 @@ const supportChannels = [
   },
 ]
 
-
-// System Status Data
-const systemStatus = {
-  overall: "operational",
-  lastUpdated: new Date(),
-  services: [
-    { name: "AI Code Generation", status: "operational", uptime: "99.9%", responseTime: "120ms" },
-    { name: "Project Editor", status: "operational", uptime: "99.8%", responseTime: "85ms" },
-    { name: "Deployment Services", status: "operational", uptime: "99.7%", responseTime: "200ms" },
-    { name: "Database Connections", status: "operational", uptime: "99.9%", responseTime: "95ms" },
-    { name: "Authentication", status: "operational", uptime: "100%", responseTime: "45ms" },
-    { name: "File Storage", status: "operational", uptime: "99.8%", responseTime: "110ms" },
-  ],
-  incidents: [
-    // {
-    //   id: 1,
-    //   title: "Scheduled Maintenance - Database Optimization",
-    //   status: "completed",
-    //   date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    //   description: "Routine database optimization completed successfully.",
-    // },
-    // {
-    //   id: 2,
-    //   title: "Minor Deployment Delays",
-    //   status: "resolved",
-    //   date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    //   description: "Brief delays in deployment services have been resolved.",
-    // },
-  ],
-}
 const categoryPdfMap: Record<string, string> = {
   "Getting Started": "/Getting_Started_with_AI_Code_Generation.pdf",
   "Deployment": "/Deploying_Your_First_Project.pdf",
@@ -321,12 +291,10 @@ const headerUser = {
             </div>
 
             <Tabs defaultValue="knowledge" className="space-y-8">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
                 <TabsTrigger value="faq">FAQ</TabsTrigger>
                 <TabsTrigger value="support">Contact Support</TabsTrigger>
-                {/* <TabsTrigger value="resources">Resources</TabsTrigger> */}
-                <TabsTrigger value="status">System Status</TabsTrigger>
               </TabsList>
 
               {/* Knowledge Base Tab */}
@@ -355,11 +323,12 @@ const headerUser = {
 
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredKnowledge.map((article) => (
-<Card
-  key={article.id}
-  className="hover:shadow-md transition-shadow cursor-pointer"
-  onClick={() => window.open(article.pdf, "_blank")}
->                      <CardContent className="p-6">
+                  <Card
+                  key={article.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => window.open(article.pdf, "_blank")}
+                  >
+                <CardContent className="p-6">
                         <div className="flex items-start justify-between mb-3">
                           <Badge variant="secondary" className="text-xs">
                             {article.category}
@@ -517,57 +486,6 @@ const headerUser = {
                         </form>
                       </CardContent>
                     </Card>
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* Status Tab */}
-              <TabsContent value="status" className="space-y-8">
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">System Status</h2>
-
-                  {/* Overall Status */}
-                  <Card className="mb-6">
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-3 mb-4">
-                        {getStatusIcon(systemStatus.overall)}
-                        <div>
-                          <h3 className="font-semibold text-green-700 capitalize">
-                            All Systems {systemStatus.overall}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">All services are running normally</p>
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Last updated: {systemStatus.lastUpdated.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Service Status */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Service Status</h3>
-                    {systemStatus.services.map((service, index) => (
-                      <Card key={index}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              {getStatusIcon(service.status)}
-                              <div>
-                                <span className="font-medium">{service.name}</span>
-                                <div className="flex items-center space-x-4 text-xs text-muted-foreground mt-1">
-                                  <span>Uptime: {service.uptime}</span>
-                                  <span>Response: {service.responseTime}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <Badge variant="secondary" className={getStatusColor(service.status)}>
-                              {service.status}
-                            </Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
                   </div>
                 </div>
               </TabsContent>

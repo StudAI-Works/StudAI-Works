@@ -55,12 +55,6 @@ const quickActions = [
   { icon: Globe, label: "Portfolio Site", description: "Personal or business portfolio" },
   { icon: Smartphone, label: "Mobile App UI", description: "Responsive mobile interface" },
 ];
-const starterTemplates = [
-  { name: "Website Template", description: "A ready-made site you can customize without coding.", icon: "🌐", color: "bg-blue-500 text-white" },
-  { name: "Blog Template", description: "Quickly start a blog — just change text and images.", icon: "📝", color: "bg-green-500 text-white" },
-  { name: "Online Store", description: "Launch your own online shop in minutes.", icon: "🛍️", color: "bg-pink-500 text-white" },
-  { name: "Portfolio", description: "Showcase your work in a professional layout.", icon: "🎨", color: "bg-purple-500 text-white" },
-];
 
 // Boilerplate HTML
 const indexHtml = `<!DOCTYPE html>
@@ -1498,22 +1492,6 @@ export default fallbackFunction;`;
                           <div className="text-xs text-muted-foreground">{action.description}</div>
                         </div>
                       </Button>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-12">
-                  <h2 className="text-2xl font-bold mb-4">Starter Templates</h2>
-                  <div className="grid md:grid-cols-4 gap-4">
-                    {starterTemplates.map((template) => (
-                      <Card key={template.name} className="cursor-pointer hover:shadow-lg transition-shadow">
-                        <CardContent className="p-6">
-                          <div className={`w-12 h-12 rounded-lg ${template.color} flex items-center justify-center text-2xl mb-4`}>
-                            {template.icon}
-                          </div>
-                          <h3 className="font-semibold mb-2">{template.name}</h3>
-                          <p className="text-sm text-muted-foreground">{template.description}</p>
-                        </CardContent>
-                      </Card>
                     ))}
                   </div>
                 </div>
