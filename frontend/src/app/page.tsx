@@ -72,21 +72,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials Section (No changes needed here)
-      <section className="bg-muted/50 py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Trusted by developers worldwide</h2>
-            <p className="text-xl text-muted-foreground">See what our users are saying about StudAI Builder</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[{name: "Sarah Chen", role: "Full Stack Developer", content: "StudAI Builder has revolutionized my development workflow. The AI code generation is incredibly accurate and saves me hours every day.", rating: 5,}, {name: "Marcus Rodriguez", role: "Tech Lead", content: "The collaboration features are outstanding. Our team can work together seamlessly, and the cloud environments are always ready to go.", rating: 5,}, {name: "Emily Johnson", role: "Startup Founder", content: "As a non-technical founder, StudAI Builder helps me prototype ideas quickly. The AI assistance makes development accessible to everyone.", rating: 5,}].map((testimonial, index) => (
-              <Card key={index} className="p-6"><CardContent className="pt-6"><div className="flex mb-4">{[...Array(testimonial.rating)].map((_, i) => (<Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />))}</div><p className="text-muted-foreground mb-4">"{testimonial.content}"</p><div><p className="font-semibold">{testimonial.name}</p><p className="text-sm text-muted-foreground">{testimonial.role}</p></div></CardContent></Card>
-            ))}
-          </div>
-        </div>
-      </section> */}
-
       {/* CTA Section (No changes needed here, except the link) */}
       <section className="container mx-auto px-4 py-20 text-center">
         <div className="max-w-2xl mx-auto">
@@ -124,7 +109,7 @@ export default function LandingPage() {
         </a>
 
         {/* Instagram */}
-        <a href="https://www.instagram.com/studai_edutech/" target="_blank" rel="noopener noreferrer">
+        <a href="https://www.instagram.com/studaione/" target="_blank" rel="noopener noreferrer">
           <Button variant="ghost" size="icon">
             {/* Instagram Icon SVG */}
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
@@ -160,21 +145,22 @@ export default function LandingPage() {
   <div>
     <h4 className="font-semibold mb-4">Ecosystem</h4>
     <ul className="space-y-2 text-muted-foreground">
-      <li><a href="https://stud-ai.com/#Roadmap" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Genie</a></li>
+      <li><a href="https://studaigenie.com/chat" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Genie</a></li>
       <li><a href="https://studaiworks.com/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Works</a></li>
       <li><a href="https://studaielev8.com/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Elev8</a></li>
       <li><a href="https://stud-ai.com/#products" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Loop</a></li>
       <li><a href="https://stud-ai.com/#products" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">StudAI Creator</a></li>
-      {/* <li><Link to="/api" className="hover:text-foreground">API</Link></li> */}
     </ul>
   </div>
 
   <div>
     <h4 className="font-semibold mb-4">Company</h4>
     <ul className="space-y-2 text-muted-foreground">
-      <li><a href="https://stud-ai.com/#Roadmap" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Roadmap</a></li>
-      <li><a href="https://stud-ai.com/#impact" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">impact</a></li>
-      <li><a href="https://stud-ai.com/#join" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Careers</a></li>
+      <li><a href="https://stud-ai.com/#ecosystem" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">About</a></li>
+      <li><a href="https://stud-ai.com/#visionary" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Leadership</a></li>
+      <li><a href="https://stud-ai.com/#csr" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">CSR</a></li>
+      <li><a href="https://stud-ai.com/#research" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Research</a></li>
+      <li><a href="https://stud-ai.com/#careers" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Careers</a></li>
       <li><a href="https://stud-ai.com/#contact" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Contact</a></li>
     </ul>
   </div>
