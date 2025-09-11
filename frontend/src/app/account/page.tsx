@@ -145,8 +145,8 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header user={headerUser} onLogout={logout} />
-            <ChatWidget/>
-      
+      <ChatWidget />
+
 
       <input type="file" ref={avatarFileRef} onChange={handleAvatarChange} hidden accept="image/*" />
 

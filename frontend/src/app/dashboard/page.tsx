@@ -107,8 +107,8 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header user={headerUser} onLogout={logout} />
-            <ChatWidget/>
-      
+      <ChatWidget />
+
 
       <div className="flex">
         <Sidebar />

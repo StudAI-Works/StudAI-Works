@@ -1511,7 +1511,7 @@ export default fallbackFunction;`;
         <Header user={headerUser} onLogout={logout} />
       </div>
 
-      <ChatWidget/>
+      <ChatWidget />
 
       {/* Main Content */}
       <main className="flex-1 min-h-0">

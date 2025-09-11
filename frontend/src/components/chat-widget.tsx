@@ -56,7 +56,7 @@ export function ChatWidget() {
 
     try {
       const currentUrl = window.location.href;
-      const res = await fetch("https://studai-builder-backend.ambitiousriver-27aa23ca.southindia.azurecontainerapps.io/chatbot", {
+      const res = await fetch("http://localhost:8080/chatbot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
