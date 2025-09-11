@@ -17,6 +17,7 @@ import { useAuth } from "../context/authContext"
 import { Navigate } from "react-router-dom"
 import { Spinner } from "@/components/ui/spinner"
 import { AvatarCropper } from "../../components/avatarCropper";
+import { ChatWidget } from "@/components/chat-widget"
 
 const API_URL = "http://localhost:8080";
 
@@ -144,6 +145,8 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header user={headerUser} onLogout={logout} />
+            <ChatWidget/>
+      
 
       <input type="file" ref={avatarFileRef} onChange={handleAvatarChange} hidden accept="image/*" />
 

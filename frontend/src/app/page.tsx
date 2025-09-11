@@ -9,6 +9,7 @@ import { Header } from "@/components/header"
 
 // --- 1. IMPORT THE useAuth HOOK ---
 import { useAuth } from "./context/authContext"
+import { ChatWidget } from "@/components/chat-widget"
 
 export default function LandingPage() {
   // --- 2. GET AUTHENTICATION STATE ---
@@ -26,6 +27,8 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background">
       {/* The Header component will now show the user's avatar if logged in, or a login button if not */}
       <Header user={headerUser} onLogout={logout} />
+            <ChatWidget/>
+      
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">

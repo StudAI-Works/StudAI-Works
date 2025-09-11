@@ -56,7 +56,7 @@ export function ChatWidget() {
 
     try {
       const currentUrl = window.location.href;
-      const res = await fetch("http://localhost:8080/chatbot", {
+      const res = await fetch("https://studai-builder-backend.ambitiousriver-27aa23ca.southindia.azurecontainerapps.io/chatbot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -111,7 +111,7 @@ export function ChatWidget() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center">
               <Bot className="h-4 w-4 mr-2" />
-              Nexus Support
+              StudAI Builder Support
             </CardTitle>
             <div className="flex items-center space-x-2">
               <Button

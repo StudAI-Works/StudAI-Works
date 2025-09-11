@@ -26,6 +26,7 @@ import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor, 
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
+import { ChatWidget } from "@/components/chat-widget";
 
 
 
@@ -1509,6 +1510,8 @@ export default fallbackFunction;`;
         <ToastContainer position="bottom-right" theme="dark" />
         <Header user={headerUser} onLogout={logout} />
       </div>
+
+      <ChatWidget/>
 
       {/* Main Content */}
       <main className="flex-1 min-h-0">

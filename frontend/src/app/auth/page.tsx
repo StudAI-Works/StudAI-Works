@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Code, Mail, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "../context/authContext";
 import { buildApiUrl } from "@/config/api";
+import { ChatWidget } from "@/components/chat-widget"
 
 export default function AuthPage() {
   const BASE_URL = 'http://localhost:8080'
@@ -119,6 +120,8 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+            <ChatWidget/>
+      
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center mb-8">
           <Link to="/" className="flex items-center space-x-2">

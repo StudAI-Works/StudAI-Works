@@ -11,6 +11,7 @@ import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder, Refres
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/dashboard-sidebar";
 import { useAuth } from "../context/authContext";
+import { ChatWidget } from "@/components/chat-widget";
 // import { HistoryPanel } from "@/components/HistoryPanel";
 
 type ProjectItem = {
@@ -106,6 +107,8 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header user={headerUser} onLogout={logout} />
+            <ChatWidget/>
+      
 
       <div className="flex">
         <Sidebar />

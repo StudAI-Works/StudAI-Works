@@ -25,6 +25,7 @@ import {
   Eye,
 } from "lucide-react"
 import { Header } from "@/components/header"
+import { ChatWidget } from "@/components/chat-widget"
 
 const mockFiles = [
   {
@@ -116,6 +117,8 @@ export default function EditorPage() {
 
     return (
       <div>
+              <ChatWidget/>
+        
         <div
           className="flex items-center space-x-2 py-1 px-2 hover:bg-muted/50 cursor-pointer rounded text-sm"
           style={{ paddingLeft: `${level * 12 + 8}px` }}
