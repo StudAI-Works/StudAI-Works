@@ -39,7 +39,9 @@ export const getProfile = ApiHandler(async (req: AuthenticatedRequest, res: Resp
  * @route   PUT /api/profile
  */
 export const updateProfile = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user?.id;
+  const userId = req.body.user;
+
+  // console.log(userId)
   
   if (!userId) {
     res.status(401).json({ error: "Unauthorized, user ID not found in token." });

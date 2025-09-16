@@ -19,9 +19,9 @@ import { Spinner } from "@/components/ui/spinner"
 import { AvatarCropper } from "../../components/avatarCropper";
 import { ChatWidget } from "@/components/chat-widget"
 import axios from "axios"
-import { response } from "express"
+// import { response } from "express"
 
-const API_URL = "http://localhost:8080";
+const API_URL = "https://studai-builder-backend.ambitiousriver-27aa23ca.southindia.azurecontainerapps.io";
 
 
 
@@ -65,7 +65,7 @@ export default function AccountPage() {
               console.error("Could not load your profile data:", error);
             });
 
-         
+
         } catch (error) {
           console.error("Failed to fetch profile", error);
           alert((error as Error).message);
@@ -86,21 +86,25 @@ export default function AccountPage() {
     if (!user || !token) return;
     setSaveStatus("saving");
     try {
-      const response = await fetch(`${API_URL}/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ fullName, bio, website }),
-      });
-      if (!response.ok) throw new Error("Failed to update profile.");
-      const updatedProfile = await response.json();
+      const response = await axios.put(
+        `${API_URL}/profile`,
+        { user: data?.user?.id, fullName, bio, website }, // Axios automatically stringifies JSON
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        }
+      );
+
+      const updatedProfile = response.data;
+
       login({ user: { ...user, fullName: updatedProfile.full_name }, token });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch (error) {
-      alert((error as Error).message);
+    } catch (error: any) {
+      console.error("Failed to update profile:", error);
+      alert(error.response?.data?.message || error.message || "Failed to update profile.");
       setSaveStatus("idle");
     }
   };
