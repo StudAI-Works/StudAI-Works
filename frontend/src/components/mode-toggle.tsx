@@ -29,12 +29,14 @@ export function ModeToggle() {
       <DropdownMenuContent
         align="center"
         side="bottom"
-        className="z-[99999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg min-w-[120px]"
+        className=""
         sideOffset={5}
         style={{
           pointerEvents: 'auto',
           position: 'fixed',
           zIndex: 99999,
+          top: '70px',
+          left: '1590px',
           backgroundColor: 'var(--background)',
           border: '1px solid var(--border)',
           borderRadius: '6px',

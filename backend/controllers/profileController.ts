@@ -8,7 +8,9 @@ import { AuthenticatedRequest } from "../middleware/authMiddleware";
  * @route   GET /api/profile
  */
 export const getProfile = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user?.id;
+  const userId = req.body.user;
+
+  // console.log(req.body)
 
   if (!userId) {
     res.status(401).json({ error: "Unauthorized, user ID not found in token." });
