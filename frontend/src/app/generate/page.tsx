@@ -1833,9 +1833,9 @@ export default fallbackFunction;`;
                           style={{ height: "100%", minHeight: 0 }}
                           className="flex-1 min-h-0"
                         >
-                          <SandpackCodeEditor
+                          {/* <SandpackCodeEditor
                             style={{ height: "calc(100vh - 240px)" }}
-                          />
+                          /> */}
                           <SandpackPreview
                             style={{ height: "calc(100vh - 240px)" }}
                           />

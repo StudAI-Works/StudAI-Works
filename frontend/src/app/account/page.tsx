@@ -18,8 +18,12 @@ import { Navigate } from "react-router-dom"
 import { Spinner } from "@/components/ui/spinner"
 import { AvatarCropper } from "../../components/avatarCropper";
 import { ChatWidget } from "@/components/chat-widget"
+import axios from "axios"
+// import { response } from "express"
 
-const API_URL = "http://localhost:8080";
+const API_URL = "https://studai-builder-backend.ambitiousriver-27aa23ca.southindia.azurecontainerapps.io";
+
+
 
 export default function AccountPage() {
   const { user, logout, login, token } = useAuth();
@@ -30,6 +34,10 @@ export default function AccountPage() {
   const [bio, setBio] = useState("");
   const [website, setWebsite] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+
+  const data = useAuth()
+
+  console.log(data.user?.id)
 
   // State for UI feedback
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -44,17 +52,19 @@ export default function AccountPage() {
       if (user && token) {
         setIsFetchingProfile(true);
         try {
-          const response = await fetch(`${API_URL}/profile`, {
-            headers: { "Authorization": `Bearer ${token}` }
-          });
-          if (!response.ok) throw new Error("Could not load your profile data.");
+          axios.post(`${API_URL}/profile`, { user: data.user?.id })
+            .then((response) => {
+              const profileData = response.data;
 
-          const profileData = await response.json();
+              setFullName(profileData.full_name || user.fullName);
+              setBio(profileData.bio || "");
+              setWebsite(profileData.website || "");
+              setAvatarUrl(profileData.avatar_url || "/placeholder.svg?height=80&width=80");
+            })
+            .catch((error) => {
+              console.error("Could not load your profile data:", error);
+            });
 
-          setFullName(profileData.full_name || user.fullName);
-          setBio(profileData.bio || "");
-          setWebsite(profileData.website || "");
-          setAvatarUrl(profileData.avatar_url || "/placeholder.svg?height=80&width=80");
 
         } catch (error) {
           console.error("Failed to fetch profile", error);
@@ -76,21 +86,25 @@ export default function AccountPage() {
     if (!user || !token) return;
     setSaveStatus("saving");
     try {
-      const response = await fetch(`${API_URL}/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ fullName, bio, website }),
-      });
-      if (!response.ok) throw new Error("Failed to update profile.");
-      const updatedProfile = await response.json();
+      const response = await axios.put(
+        `${API_URL}/profile`,
+        { user: data?.user?.id, fullName, bio, website }, // Axios automatically stringifies JSON
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        }
+      );
+
+      const updatedProfile = response.data;
+
       login({ user: { ...user, fullName: updatedProfile.full_name }, token });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch (error) {
-      alert((error as Error).message);
+    } catch (error: any) {
+      console.error("Failed to update profile:", error);
+      alert(error.response?.data?.message || error.message || "Failed to update profile.");
       setSaveStatus("idle");
     }
   };
@@ -238,7 +252,6 @@ export default function AccountPage() {
                 </TabsContent>
                 <TabsContent value="notifications" className="space-y-6">
                   <Card><CardHeader><CardTitle>Email Notifications</CardTitle><CardDescription>Choose what email notifications you'd like to receive</CardDescription></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Project Updates</div><div className="text-sm text-muted-foreground">Get notified when projects are updated</div></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Team Invitations</div><div className="text-sm text-muted-foreground">Get notified when you're invited to teams</div></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Marketing Emails</div><div className="text-sm text-muted-foreground">Receive updates about new features</div></div><Switch /></div></CardContent></Card>
-                  <Card><CardHeader><CardTitle>Push Notifications</CardTitle><CardDescription>Manage your push notification preferences</CardDescription></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Build Notifications</div><div className="text-sm text-muted-foreground">Get notified when builds complete</div></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Collaboration</div><div className="text-sm text-muted-foreground">Get notified about team activity</div></div><Switch defaultChecked /></div></CardContent></Card>
                 </TabsContent>
                 <TabsContent value="billing" className="space-y-6">
                   <Card><CardHeader><CardTitle>Current Plan</CardTitle><CardDescription>Manage your subscription and billing information</CardDescription></CardHeader><CardContent><div className="flex items-center justify-between p-4 border rounded-lg"><div><div className="font-medium">Pro Plan</div><div className="text-sm text-muted-foreground">$29/month • Next billing: Jan 15, 2025</div></div><Badge>Active</Badge></div><div className="mt-4 space-x-2"><Button variant="outline">Change Plan</Button><Button variant="outline">Cancel Subscription</Button></div></CardContent></Card>

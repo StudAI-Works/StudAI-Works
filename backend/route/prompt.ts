@@ -71,24 +71,6 @@ It contains Link to Homepage(Logo of Studai Builder),generate page, projects pag
 
 ---
 
-### Team Collaboration
-
-**1. Creating and Managing an Organization**
-* **Step 1:** Navigate to the **Organization** page from the sidebar.
-* **Step 2:** Click on **"Create Organization"** and fill in the required details.
-* **Step 3:** You can edit the organization's name and description from the organization card.
-
-**2. Inviting Team Members**
-* **Step 1:** On the **Organization** page, click the **"Invite Members"** button.
-* **Step 2:** Enter the email address of the person you want to invite and assign them a role (e.g., Editor, Viewer).
-* **Step 3:** Click **"Send Invitation"** to add them to your team.
-
-**3. Team Chat**
-* **Step 1:** The **Team Chat** widget is available on the **Organization** page.
-* **Step 2:** Use the chatbox to send messages and collaborate with your team members in real-time.
-
----
-
 ### Account Settings
 
 **1. Updating Your Profile**

@@ -62,9 +62,9 @@ router.post("/signup", SignUpUser);
 router.post("/signin", SignInUser);
 
 // Protected routes
-router.put("/profile", protect, updateProfile);
+router.put("/profile", updateProfile);
 router.post("/profile/avatar", protect, upload.single("avatar"), updateAvatar);
-router.get("/profile", protect, getProfile);
+router.post("/profile", getProfile);
 router.get("/allusers", protect, Allusers);
 
 // Conversational AI routes
@@ -169,7 +169,7 @@ router.get("/api/config", (_req: Request, res: Response): void => {
 // Project routes
 router.post("/api/projects/:id/save", maybeProtectProjects, saveGeneratedOutput);
 router.post("/api/projects/:id/edit", maybeProtectProjects, editProject);
-router.get("/api/projects", maybeProtectProjects, listProjects);
+router.get("/api/projects", listProjects);
 router.get("/api/projects/:id", maybeProtectProjects, getProjectDetail);
 router.delete("/api/projects/:id", maybeProtectProjects, deleteProject);
 router.post("/api/projects", maybeProtectProjects, createBlankProject);
