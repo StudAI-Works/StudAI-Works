@@ -61,7 +61,114 @@ export function Header({ user, onLogout }: HeaderProps) {
         <div className="flex items-center space-x-4">
           {isAuthenticated && (
             <>
-          
+              {/* Deploy Button */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  {/* <Button variant="outline" size="sm">
+                    <Rocket className="mr-2 h-4 w-4" />
+                    Deploy
+                  </Button> */}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="z-[99999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg min-w-[200px]"
+                  sideOffset={5}
+                  style={{
+                    pointerEvents: 'auto',
+                    position: 'fixed',
+                    zIndex: 99999,
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '4px 0',
+                    minWidth: '200px'
+                  }}
+                >
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <Cloud className="mr-2 h-4 w-4" />
+                    Deploy to Vercel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <Cloud className="mr-2 h-4 w-4" />
+                    Deploy to Netlify
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <Database className="mr-2 h-4 w-4" />
+                    Deploy to Railway
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Connect Database */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  {/* <Button variant="outline" size="sm">
+                    <Database className="mr-2 h-4 w-4" />
+                    Connect
+                  </Button> */}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="z-[99999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg min-w-[200px]"
+                  sideOffset={5}
+                  style={{
+                    pointerEvents: 'auto',
+                    position: 'fixed',
+                    zIndex: 99999,
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '4px 0',
+                    minWidth: '200px'
+                  }}
+                >
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                      Connect to Supabase
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 bg-orange-500 rounded mr-2"></div>
+                      Connect to Firebase
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                      Connect to Neon
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                      Connect to Upstash
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
 

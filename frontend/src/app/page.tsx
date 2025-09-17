@@ -33,7 +33,6 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
         <div className="max-w-4xl mx-auto">
-        
           <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
             Your Intelligent Code Companion
           </h1>
@@ -53,13 +52,12 @@ export default function LandingPage() {
             Watch Demo
             </Button>
             </a>
-
           </div>
         </div>
       </section>
 
       {/* Features Section (No changes needed here) */}
-      <section className="container mx-auto px-4 py-20">
+      <section className="container mx-auto px-4 py-2">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need to build faster</h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
