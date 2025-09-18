@@ -1570,7 +1570,7 @@ export default fallbackFunction;`;
           <ResizablePanelGroup direction="horizontal" className="h-full w-full">
             {/* ---------- Left Panel (AI Assistant) ---------- */}
             <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-              <div className="h-full flex flex-col">
+              <div className="h-screen flex flex-col">
                 {/* Header */}
                 <div className="border-b p-4 flex-shrink-0">
                   <h2 className="font-semibold flex items-center">
