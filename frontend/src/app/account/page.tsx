@@ -37,7 +37,7 @@ export default function AccountPage() {
 
   const data = useAuth()
 
-  console.log(data.user?.id)
+  // console.log(data.user?.id)
 
   // State for UI feedback
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -149,7 +149,7 @@ export default function AccountPage() {
       alert((error as Error).message);
     }
   };
-  console.log(fullName)
+  // console.log(fullName)
   const headerUser = {
     name: fullName || "New User",
     email: user.email,

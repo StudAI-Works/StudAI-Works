@@ -11,7 +11,7 @@ function Home() {
     if (userPromt?.current?.value) {
       axios.post(`${BASE_URL}/userpromt`, { Promt: userPromt.current.value })
         .then(res => {
-          console.log(res)
+          // console.log(res)
           if (res.data) {
             toast.success("Sent", { autoClose: 1500, style: { fontSize: "14px", width: "140px" } })
           }

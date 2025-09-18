@@ -274,7 +274,7 @@ export default function GeneratePage() {
       },
       '/src/setupEnv.ts': {
         code: `// Environment setup for preview - executed first
-console.log('[Preview] Setting up environment variables...');
+// console.log('[Preview] Setting up environment variables...');
 
 // Create process object if it doesn't exist
 if (typeof window !== 'undefined') {
@@ -286,7 +286,7 @@ if (typeof window !== 'undefined') {
   env.REACT_APP_SUPABASE_ANON_KEY = env.REACT_APP_SUPABASE_ANON_KEY || 'your-anon-key';
   env.REACT_APP_API_URL = env.REACT_APP_API_URL || 'http://localhost:3001';
   
-  console.log('[Preview] Environment variables set:', {
+  // console.log('[Preview] Environment variables set:', {
     SUPABASE_URL: env.REACT_APP_SUPABASE_URL,
     API_URL: env.REACT_APP_API_URL,
     SUPABASE_KEY_SET: !!env.REACT_APP_SUPABASE_ANON_KEY
@@ -1026,7 +1026,7 @@ export default fallbackFunction;`;
       });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
-      console.log(data)
+      // console.log(data)
       setSessionId(data.session_id);
 
       // Add initial message to UI
@@ -1116,7 +1116,7 @@ export default fallbackFunction;`;
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      console.log('Edit response', data);
+      // console.log('Edit response', data);
       const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
       if (arts.length > 0) {
         const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
@@ -1161,7 +1161,7 @@ export default fallbackFunction;`;
         sessionid = await startConversation();
         localStorage.setItem("sessionid", sessionid)
       }
-      console.log(sessionid)
+      // console.log(sessionid)
       const res = await fetch(`${BASE_URL}/refine`, {
         method: 'POST',
         headers: getAuthHeaders(),

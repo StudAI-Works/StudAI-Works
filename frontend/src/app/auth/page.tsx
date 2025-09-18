@@ -58,7 +58,7 @@ export default function AuthPage() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to sign in.");
       }
-      console.log(data)
+      // console.log(data)
       const userData = {
         id: data.user.id,
         email: data.user.email,
@@ -84,7 +84,7 @@ export default function AuthPage() {
     setSignupSuccess(false);
 
     try {
-      console.log(signUpName)
+      // console.log(signUpName)
       const response = await fetch(`${BASE_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

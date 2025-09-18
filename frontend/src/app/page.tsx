@@ -16,7 +16,7 @@ export default function LandingPage() {
   const { user, isAuthenticated, logout } = useAuth();
 
   // --- 3. PREPARE USER DATA FOR THE HEADER ---
-  console.log(user)
+  // console.log(user)
   const headerUser = user ? {
     name: user.fullName || "New User",
     email: user.email,
