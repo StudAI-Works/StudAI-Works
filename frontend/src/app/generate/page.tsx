@@ -1584,16 +1584,16 @@ const handleSaveProject = async () => {
           <ResizablePanelGroup direction="horizontal" className="h-full w-full">
             {/* ---------- Left Panel (AI Assistant) ---------- */}
             <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-              <div className="h-screen flex flex-col">
+              <div className="h-screen flex flex-col ">
                 {/* Header */}
-                <div className="border-b p-4 flex-shrink-0">
+                <div className="border-b p-4 flex-shrink-0 mt-14">
                   <h2 className="font-semibold flex items-center">
                     <Sparkles className="mr-2 h-5 w-5 text-primary" /> AI Assistant
                   </h2>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-2"
+                    className="-mt-10"
                     onClick={handleGenerateCode}
                     disabled={isGenerating}
                   >
