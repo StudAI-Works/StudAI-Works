@@ -20,7 +20,7 @@ export const historyService = {
     async storeFile(fileContent: string, fileName: string, fileType: string): Promise<{ fileUrl: string }> {
         try {
             const { headers } = getAuthData();
-            console.log('Storing file:', { fileName, fileType, contentLength: fileContent.length });
+            // console.log('Storing file:', { fileName, fileType, contentLength: fileContent.length });
 
             const response = await axios.post(
                 buildApiUrl('/api/history/file'),
@@ -31,7 +31,7 @@ export const historyService = {
                 },
                 { headers }
             );
-            console.log('File stored successfully:', response.data);
+            // console.log('File stored successfully:', response.data);
             return response.data;
         } catch (error) {
             console.error('Failed to store file:', error);
@@ -49,7 +49,7 @@ export const historyService = {
                 buildApiUrl('/api/history/files'),
                 { headers }
             );
-            console.log('File history response:', response.data);
+            // console.log('File history response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Failed to fetch file history:', error);
@@ -63,15 +63,15 @@ export const historyService = {
     async deleteFile(fileId: string): Promise<void> {
         try {
             const { headers } = getAuthData();
-            console.log('Deleting file:', fileId);
+            // console.log('Deleting file:', fileId);
 
             await axios.delete(
                 buildApiUrl(`/api/history/files/${fileId}`),
                 { headers }
             );
-            console.log('File deleted successfully');
+            // console.log('File deleted successfully');
         } catch (error) {
-            console.error('Failed to delete file:', error);
+            // console.error('Failed to delete file:', error);
             throw error;
         }
     }

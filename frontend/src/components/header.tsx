@@ -187,21 +187,21 @@ export function Header({ user, onLogout }: HeaderProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                // className="w-56  bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg"/\
+                className="w-56  bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg"
                 align="end"
-                sideOffset={5}
+                sideOffset={8}
+                side="bottom"
                 style={{
                   pointerEvents: 'auto',
                   position: 'absolute',
                   top: '70px',
-                  left: '1510px',   
+                  left: '1300px',   
                   backgroundColor: 'var(--background)',
                   border: '1px solid var(--border)',
                   borderRadius: '6px',
                   padding: '4px 0',
-                  minWidth: '200px'
+                  minWidth: '200px' 
                 }}
-
               >
                 <div className="flex items-center justify-start gap-2 p-2">
                   <div className="flex flex-col space-y-1 leading-none">

@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedSession = localStorage.getItem('StudAI-Builder');
       if (storedSession) {
         const session: Session = JSON.parse(storedSession);
-        console.log(session)
+        // console.log(session)
         setUser(session.user);
         setToken(session.token);
       }
@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = (sessionData: Session) => {
-    console.log(sessionData)
+    // console.log(sessionData)
     // --- UPDATE: Store the full session ---
     setUser(sessionData.user);
     setToken(sessionData.token);

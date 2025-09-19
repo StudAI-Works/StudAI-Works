@@ -130,7 +130,7 @@ router.post("/api/generate", maybeProtect, async (req: Request, res: Response): 
 
     req.on("close", () => {
       response.data.destroy();
-      console.log("Client disconnected, stream closed");
+      // console.log("Client disconnected, stream closed");
     });
   } catch (error: any) {
     console.error("Error generating code:", error.message);

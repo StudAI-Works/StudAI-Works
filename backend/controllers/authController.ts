@@ -8,7 +8,7 @@ export const SignUpUser = async (req: Request, res: Response): Promise<void> => 
   const { fullName = "Unnamed User", email, password } = req.body;
 
   // Basic input validation
-  console.log(fullName)
+  // console.log(fullName)
   if (!fullName || !email || !password) {
     res.status(400).json({ error: "Full name, email, and password are required." });
     return;
@@ -36,7 +36,7 @@ export const SignUpUser = async (req: Request, res: Response): Promise<void> => 
       website: "",
       avatar_url: "",
     };
-    console.log("Inserting Profile:", profileData);
+    // console.log("Inserting Profile:", profileData);
 
     // Step 2: Insert user profile
     const { error: profileError } = await supabase
@@ -56,7 +56,7 @@ export const SignUpUser = async (req: Request, res: Response): Promise<void> => 
       .eq("id", userId)
       .single();
 
-    console.log("Inserted Profile:", insertedProfile);
+    // console.log("Inserted Profile:", insertedProfile);
 
     res.status(201).json({
       message: "User signed up successfully",
@@ -73,7 +73,7 @@ export const SignUpUser = async (req: Request, res: Response): Promise<void> => 
 
 export const SignInUser = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
-  console.log(email)
+  // console.log(email)
   let fullName;
 
   try {
@@ -82,7 +82,7 @@ export const SignInUser = async (req: Request, res: Response): Promise<void> => 
       password,
     });
 
-    console.log(data)
+    // console.log(data)
 
     if (error) {
       res.status(401).json({ error: "Invalid email or password." });
@@ -90,9 +90,9 @@ export const SignInUser = async (req: Request, res: Response): Promise<void> => 
     }
     
     let id = data.user.id
-    console.log(id)
+    // console.log(id)
     const { data: fullname, error: err } = await supabase.from("profiles").select('full_name').eq("id", id)
-    console.log(fullname)
+    // console.log(fullname)
 
     res.status(200).json({
       message: "Signed in successfully",

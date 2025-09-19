@@ -224,7 +224,7 @@ const headerUser = {
 
   const handleTicketSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Support ticket submitted:", ticketForm)
+    // console.log("Support ticket submitted:", ticketForm)
     // Reset form
     setTicketForm({
       subject: "",

@@ -36,7 +36,7 @@ export function ModeToggle() {
           position: 'fixed',
           zIndex: 99999,
           top: '70px',
-          left: '1590px',
+          left: '1350px',
           backgroundColor: 'var(--background)',
           border: '1px solid var(--border)',
           borderRadius: '6px',

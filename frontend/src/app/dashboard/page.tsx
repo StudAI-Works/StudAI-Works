@@ -100,7 +100,7 @@ export default function DashboardPage() {
     }
   };
 
-  console.log(user);
+  // console.log(user);
   const headerUser = {
     name: user.fullName,
     email: user.email,
@@ -156,7 +156,7 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProjects.map((project) => (
-                <Link key={project.id} to={`/generate?project=${project.id}`} className="block">
+                <Link key={project.id} to={`/generate?project=${project.id}?title=${project.title}`} className="block">
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">

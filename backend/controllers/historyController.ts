@@ -9,8 +9,8 @@ import { AuthenticatedRequest } from "../middleware/authMiddleware";
  */
 export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.id;
-    console.log("User ID:", userId);
-    console.log("Request body:", req.body);
+    // console.log("User ID:", userId);
+    // console.log("Request body:", req.body);
 
     if (!userId) {
         res.status(401).json({ error: "Unauthorized, user ID not found in token." });
@@ -28,13 +28,13 @@ export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, r
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
     const filePath = `${userId}/${Date.now()}_${sanitizedFileName}`;
 
-    console.log("Storage upload details:", {
-        userId,
-        filePath,
-        fileName: sanitizedFileName,
-        fileType,
-        bucket: "user-files"
-    });
+    // // console.log("Storage upload details:", {
+    //     userId,
+    //     filePath,
+    //     fileName: sanitizedFileName,
+    //     fileType,
+    //     bucket: "user-files"
+    // });
 
     try {
         // Convert string content to Buffer if it's not already
@@ -42,11 +42,11 @@ export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, r
             ? Buffer.from(fileContent)
             : fileContent;
 
-        console.log("Uploading file:", {
-            path: filePath,
-            type: fileType,
-            size: fileBuffer.length
-        });
+        // console.log("Uploading file:", {
+        //     path: filePath,
+        //     type: fileType,
+        //     size: fileBuffer.length
+        // });
 
         const { error: uploadError } = await supabase.storage
             .from("user-files")
@@ -62,7 +62,7 @@ export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, r
             return;
         }
 
-        console.log("File uploaded successfully");
+        // console.log("File uploaded successfully");
 
         // Get public URL
         const { data: urlData } = supabase.storage
@@ -75,7 +75,7 @@ export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, r
             return;
         }
 
-        console.log("Generated public URL:", urlData.publicUrl);
+        // console.log("Generated public URL:", urlData.publicUrl);
 
         // Store file metadata in database
         const { error: dbError } = await supabase
@@ -111,7 +111,7 @@ export const storeGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, r
  */
 export const storeChatMessage = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.id;
-    console.log("User ID from token:", userId);
+    // console.log("User ID from token:", userId);
 
     if (!userId) {
         res.status(401).json({ error: "Unauthorized, user ID not found in token." });
@@ -119,7 +119,7 @@ export const storeChatMessage = ApiHandler(async (req: AuthenticatedRequest, res
     }
 
     const { message, role } = req.body;
-    console.log("Chat message:", { message, role });
+    // console.log("Chat message:", { message, role });
 
     if (!message || !role) {
         res.status(400).json({ error: "Missing required message information" });
@@ -155,7 +155,7 @@ export const storeChatMessage = ApiHandler(async (req: AuthenticatedRequest, res
  */
 export const getFileHistory = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.id;
-    console.log("Getting file history for user:", userId);
+    // console.log("Getting file history for user:", userId);
 
     if (!userId) {
         res.status(401).json({ error: "Unauthorized, user ID not found in token." });
@@ -175,7 +175,7 @@ export const getFileHistory = ApiHandler(async (req: AuthenticatedRequest, res: 
             return;
         }
 
-        console.log("File history retrieved:", files?.length || 0, "files");
+        // console.log("File history retrieved:", files?.length || 0, "files");
         res.status(200).json(files || []);
     } catch (error) {
         console.error("Unexpected error:", error);
@@ -189,14 +189,14 @@ export const getFileHistory = ApiHandler(async (req: AuthenticatedRequest, res: 
  */
 export const getChatHistory = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.body.log;
-    console.log("Getting chat history for user:", userId);
+    // console.log("Getting chat history for user:", userId);
 
     if (!userId) {
         res.status(401).json({ error: "Unauthorized, user ID not found in token." });
         return;
     }
 
-    console.log(userId)
+    // console.log(userId)
 
     try {
         const { data: messages, error } = await supabase
@@ -211,7 +211,7 @@ export const getChatHistory = ApiHandler(async (req: AuthenticatedRequest, res: 
             return;
         }
 
-        console.log("Chat history retrieved:", messages?.length || 0, "messages");
+        // console.log("Chat history retrieved:", messages?.length || 0, "messages");
         res.status(200).json(messages || []);
     } catch (error) {
         console.error("Unexpected error:", error);
@@ -224,7 +224,7 @@ export const getChatHistory = ApiHandler(async (req: AuthenticatedRequest, res: 
  * @route   DELETE /api/history/file/:id
  */
 export const deleteGeneratedFile = ApiHandler(async (req: AuthenticatedRequest, res: Response) => {
-    console.log("hello")
+    // console.log("hello")
     const userId = req.body;
     const fileId = req.params.id;
 
