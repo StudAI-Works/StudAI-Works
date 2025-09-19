@@ -22,7 +22,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor, useSandpack, useSandpackConsole } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole  } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
