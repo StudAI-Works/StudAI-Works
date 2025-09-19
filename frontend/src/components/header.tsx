@@ -220,13 +220,13 @@ export function Header({ user, onLogout }: HeaderProps) {
                     Account
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem
+                {/* <DropdownMenuItem
                   className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
                   style={{ pointerEvents: 'auto' }}
                 >
                   <CreditCard className="mr-2 h-4 w-4" />
                   Billing
-                </DropdownMenuItem>
+                </DropdownMenuItem> */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={onLogout}

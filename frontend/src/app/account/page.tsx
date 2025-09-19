@@ -187,11 +187,11 @@ export default function AccountPage() {
               </div>
             ) : (
               <Tabs defaultValue="profile" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-1">
                   <TabsTrigger value="profile">Profile</TabsTrigger>
-                  <TabsTrigger value="security">Security</TabsTrigger>
+                  {/* <TabsTrigger value="security">Security</TabsTrigger>
                   <TabsTrigger value="notifications">Notifications</TabsTrigger>
-                  <TabsTrigger value="billing">Billing</TabsTrigger>
+                  <TabsTrigger value="billing">Billing</TabsTrigger> */}
                 </TabsList>
 
                 <TabsContent value="profile" className="space-y-6">
@@ -245,7 +245,7 @@ export default function AccountPage() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="security" className="space-y-6">
+                {/* <TabsContent value="security" className="space-y-6">
                   <Card><CardHeader><CardTitle>Password</CardTitle><CardDescription>Change your password to keep your account secure</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="currentPassword">Current Password</Label><Input id="currentPassword" type="password" /></div><div className="space-y-2"><Label htmlFor="newPassword">New Password</Label><Input id="newPassword" type="password" /></div><div className="space-y-2"><Label htmlFor="confirmPassword">Confirm New Password</Label><Input id="confirmPassword" type="password" /></div><Button>Update Password</Button></CardContent></Card>
                   <Card><CardHeader><CardTitle>Two-Factor Authentication</CardTitle><CardDescription>Add an extra layer of security to your account</CardDescription></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">SMS Authentication</div><div className="text-sm text-muted-foreground">Receive codes via SMS</div></div><Switch /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><div className="text-sm font-medium">Authenticator App</div><div className="text-sm text-muted-foreground">Use an authenticator app</div></div><Switch /></div></CardContent></Card>
                   <Card><CardHeader><CardTitle>API Keys</CardTitle><CardDescription>Manage your API keys for external integrations</CardDescription></CardHeader><CardContent><div className="space-y-4"><div className="flex items-center justify-between p-3 border rounded-lg"><div><div className="font-medium">Production API Key</div><div className="text-sm text-muted-foreground">Created on Dec 15, 2024</div></div><Button variant="outline" size="sm">Regenerate</Button></div><Button variant="outline"><Key className="mr-2 h-4 w-4" />Create New API Key</Button></div></CardContent></Card>
@@ -257,7 +257,7 @@ export default function AccountPage() {
                   <Card><CardHeader><CardTitle>Current Plan</CardTitle><CardDescription>Manage your subscription and billing information</CardDescription></CardHeader><CardContent><div className="flex items-center justify-between p-4 border rounded-lg"><div><div className="font-medium">Pro Plan</div><div className="text-sm text-muted-foreground">$29/month • Next billing: Jan 15, 2025</div></div><Badge>Active</Badge></div><div className="mt-4 space-x-2"><Button variant="outline">Change Plan</Button><Button variant="outline">Cancel Subscription</Button></div></CardContent></Card>
                   <Card><CardHeader><CardTitle>Payment Method</CardTitle><CardDescription>Update your payment information</CardDescription></CardHeader><CardContent><div className="flex items-center justify-between p-4 border rounded-lg"><div className="flex items-center space-x-3"><CreditCard className="h-8 w-8 text-muted-foreground" /><div><div className="font-medium">•••• •••• •••• 4242</div><div className="text-sm text-muted-foreground">Expires 12/2027</div></div></div><Button variant="outline" size="sm">Update</Button></div></CardContent></Card>
                   <Card><CardHeader><CardTitle>Billing History</CardTitle><CardDescription>View your past invoices and payments</CardDescription></CardHeader><CardContent><div className="space-y-3">{[{ date: "Dec 15, 2024", amount: "$29.00", status: "Paid" }, { date: "Nov 15, 2024", amount: "$29.00", status: "Paid" }, { date: "Oct 15, 2024", amount: "$29.00", status: "Paid" },].map((invoice, index) => (<div key={index} className="flex items-center justify-between p-3 border rounded-lg"><div><div className="font-medium">{invoice.date}</div><div className="text-sm text-muted-foreground">Pro Plan Subscription</div></div><div className="text-right"><div className="font-medium">{invoice.amount}</div><Badge variant="secondary" className="text-xs">{invoice.status}</Badge></div></div>))}</div></CardContent></Card>
-                </TabsContent>
+                </TabsContent> */}
               </Tabs>
             )}
           </div>
