@@ -127,6 +127,11 @@ class ConversationResponse(BaseModel):
 class GenerateRequest(BaseModel):
     session_id: str
 
+class EditResponse(BaseModel):
+    content: str
+    media_type: str
+    summary: str = ""
+
 class StartResponse(BaseModel):
     session_id: str
     message: str
@@ -409,22 +414,7 @@ async def generate_code(request: GenerateRequest):
 #         logger.error(f"Error during edit: {str(e)}")
 #         raise HTTPException(status_code=500, detail=str(e))
 
-def apply_unified_diff(
-    original_files: Dict[str, str], 
-    parsed_diffs: List[Tuple[str, str]],
-    margin: int = 10, 
-    fuzzy_threshold: float = 0.7
-) -> Dict[str, str]:
-    """
-    Robustly applies unified diffs to original files, handling mismatched line numbers
-    and minor format errors with strict context and fuzzy matching.
-
-    :param original_files: dict of {file_path: file_content}
-    :param parsed_diffs: list of tuples (file_path, patch_text)
-    :param margin: strict context matching window in lines
-    :param fuzzy_threshold: similarity ratio for fallback matching
-    :return: dict of {file_path: new_content} with patched content
-    """
+def apply_unified_diff( original_files: Dict[str, str], parsed_diffs: List[Tuple[str, str]], margin: int = 10, fuzzy_threshold: float = 0.7) -> Dict[str, str]:
     if not parsed_diffs:
         raise ValueError("No diffs found in markdown")
     
@@ -433,8 +423,11 @@ def apply_unified_diff(
 
     for path, patch_text in parsed_diffs:
         path = path.strip()
+        
+        # Create new file if it doesn't exist
         if path not in patched_files:
-            raise ValueError(f"No original content for file: {path}")
+            print(f"INFO: Creating new file: {path}")
+            patched_files[path] = ""
         
         original_lines = patched_files[path].splitlines(keepends=True)
         patched_lines = list(original_lines)
@@ -464,23 +457,38 @@ def apply_unified_diff(
                 elif line.startswith('+'):
                     hunk_new_lines.append(line[1:])
 
+            # For new/empty files, handle creation diff differently
+            if len(original_lines) == 0 and original_start == 0:
+                # This is likely a new file creation diff
+                patched_lines = hunk_new_lines
+                # Ensure file ends with newline
+                if patched_lines and not patched_lines[-1].endswith('\n'):
+                    patched_lines[-1] += '\n'
+                continue
+
             # Match context strictly within margin
             window_len = len(hunk_original_lines)
             start = max(0, original_start - margin)
             end = min(len(original_lines) - window_len + 1, original_start + margin + 1)
             found_index = -1
-            for j in range(start, end):
-                match = True
-                for k in range(window_len):
-                    if original_lines[j + k].strip() != hunk_original_lines[k]:
-                        match = False
+            
+            # Skip context matching if file is empty or context is empty
+            if len(original_lines) == 0 or window_len == 0:
+                if window_len == 0:  # Only additions
+                    found_index = min(original_start, len(original_lines))
+            else:
+                for j in range(start, end):
+                    match = True
+                    for k in range(window_len):
+                        if original_lines[j + k].strip() != hunk_original_lines[k]:
+                            match = False
+                            break
+                    if match:
+                        found_index = j
                         break
-                if match:
-                    found_index = j
-                    break
 
             # Fuzzy matching fallback
-            if found_index == -1 and window_len > 0:
+            if found_index == -1 and window_len > 0 and len(original_lines) > 0:
                 best_ratio = 0
                 best_index = -1
                 for j in range(len(original_lines) - window_len + 1):
@@ -497,13 +505,14 @@ def apply_unified_diff(
                     continue  # Skip hunk if no reasonable place found
 
             # Apply the patch
-            del patched_lines[found_index + offset : found_index + offset + window_len]
-            patched_lines[found_index + offset : found_index + offset] = hunk_new_lines
-            # Ensure patched segment ends with a newline
-            if patched_lines and not patched_lines[-1].endswith('\n'):
-                patched_lines[-1] += '\n'
-
-            offset += len(hunk_new_lines) - window_len
+            if found_index != -1:
+                del patched_lines[found_index + offset : found_index + offset + window_len]
+                patched_lines[found_index + offset : found_index + offset] = hunk_new_lines
+                # Ensure patched segment ends with a newline
+                if patched_lines and not patched_lines[-1].endswith('\n'):
+                    patched_lines[-1] += '\n'
+                
+                offset += len(hunk_new_lines) - window_len
             
         patched_files[path] = ''.join(patched_lines)
     return patched_files
@@ -514,64 +523,66 @@ async def edit_code(req: EditRequest):
         if not AZURE_READY or client is None:
             raise HTTPException(status_code=503, detail="Azure OpenAI is not configured. Please set AZURE_OPENAI_* env vars.")
 
+        file_names = [f.path for f in req.files]
         SYSTEM_PROMPT = ("""
             You are an expert software engineer and code editor specializing in UNIFIED DIFFs. Given a user's instructions or a concrete error, produce **only** the necessary unified diff patch content to implement the change or fix the error.
+            **Strictly follow this output format:**
 
-**Strictly follow this output format:**
+            1.  **File Header:** Start with `####` followed by the file path.
+            2.  **Code Block:** Use a `patch` markdown code block.
+            3.  **Unified Diff Hunks:**
+                * Each change must be in a unified diff hunk, starting with `@@ ... @@`.
+                * **INCLUDE CONTEXT LINES.** Provide 3 lines of unchanged context above and below the change.
+                * Prefix removed lines with `-`.
+                * Prefix added lines with `+`.
+                * Prefix context lines with ` `.
+            4.  **Hunk Header Format:** The header `@@ -<start_line>,<num_lines> +<start_line>,<num_lines> @@` must be precise.
+                * The first `<start_line>` and `<num_lines>` refer to the original file. GIVING CORRECT LINE NUMBERS IS VERY CRUCIAL.
+                * The second `<start_line>` and `<num_lines>` refer to the new file.
+                * **Count all changed lines and context lines.** The `<num_lines>` value must be the **exact number of `+`, `-`, and ` ` lines** within that hunk.
+                * The line numbers must be accurate relative to the entire file, **starting from 1**.
 
-1.  **File Header:** Start with `####` followed by the file path.
-2.  **Code Block:** Use a `patch` markdown code block.
-3.  **Unified Diff Hunks:**
-    * Each change must be in a unified diff hunk, starting with `@@ ... @@`.
-    * **INCLUDE CONTEXT LINES.** Provide 3 lines of unchanged context above and below the change.
-    * Prefix removed lines with `-`.
-    * Prefix added lines with `+`.
-    * Prefix context lines with ` `.
-4.  **Hunk Header Format:** The header `@@ -<start_line>,<num_lines> +<start_line>,<num_lines> @@` must be precise.
-    * The first `<start_line>` and `<num_lines>` refer to the original file. GIVING CORRECT LINE NUMBERS IS VERY CRUCIAL.
-    * The second `<start_line>` and `<num_lines>` refer to the new file.
-    * **Count all changed lines and context lines.** The `<num_lines>` value must be the **exact number of `+`, `-`, and ` ` lines** within that hunk.
-    * The line numbers must be accurate relative to the entire file, **starting from 1**.
+            **Example:**
+            *Original File:*
+            #### src/App.js
+            ```javascript
+            1. import React from 'react';
+            2. const App = () => {
+            3.  // A component
+            4.  return (
+            5.    <div>
+            6.      <h1>Hello, world!</h1>
+            7.    </div>
+            8.  );
+            9.};
+            ```
+            *Instruction:* Change the heading to "My App".
 
-**Example:**
-*Original File:*
-#### src/App.js
-```javascript
-1. import React from 'react';
-2. const App = () => {
-3.  // A component
-4.  return (
-5.    <div>
-6.      <h1>Hello, world!</h1>
-7.    </div>
-8.  );
-9.};
-```
-*Instruction:* Change the heading to "My App".
-
-*Expected Output:*
-#### src/App.js
-```patch
-@@ -3,7 +3,7 @@
-  // A component
-  return (
-    <div>
--      <h1>Hello, world!</h1>
-+      <h1>My App</h1>
-    </div>
-  );
- };
-```
+            *Expected Output:*
+            #### src/App.js
+            ```patch
+            @@ -3,7 +3,7 @@
+            // A component
+            return (
+                <div>
+            -      <h1>Hello, world!</h1>
+            +      <h1>My App</h1>
+                </div>
+            );
+            };
+            ```
             Crucial Rules:
                 1. Give UNIFIED DIFFS only, no full files.
                 2. Do not include any text, explanations, or conversational filler before, during, or after the patch output.
                 3. If no changes are needed, return a completely empty response.
                 4. If multiple files are changed, output a separate markdown block for each file.
                 5. Your task is to act as a code editor based on this perfect prompt.
+            Finally, give a summary of the changes made after the diffs using the same format and name of file as "SUMMARY.md" and the content should be in markdown.
+            Here, provide a concise summary of all changes made across files and any other information the user will need(e.g. How to get an API Key).
+            If the file to be changed is not in `${file_names}`, give the full file content in the same format as above.Keep it short and to-the point.      
             """
         )
-        file_names = [f.path for f in req.files]
-        print("file: ",file_names)
+
         files_text_parts = []
         for f in req.files:
             print(f.path)
@@ -614,7 +625,9 @@ async def edit_code(req: EditRequest):
         content = resp.choices[0].message.content or ""
 
         print("AI response content:", content)
-        # Extract diff blocks by file
+        summary_match = re.search(r"####\s*SUMMARY\.md\s*```markdown\s*(.*?)```", content, re.DOTALL)
+        summary_md = summary_match.group(1).strip() if summary_match else ""
+        print("Extracted SUMMARY.md content:", summary_md)
         parsed_diffs = re.findall(r"#### (.*?)\n```patch\n(.*?)\n```", content, re.DOTALL)
         if not parsed_diffs:
             # No changes sent by LLM
@@ -623,7 +636,13 @@ async def edit_code(req: EditRequest):
         original_files_map = {f.path: f.content for f in req.files}
         # Apply all diffs to original files
         full_updated_files = {}
-        full_updated_files=apply_unified_diff(original_files_map, parsed_diffs)
+        
+        diffs_only = [
+        (file_path, patch)
+        for (file_path, patch) in parsed_diffs
+        if file_path.strip() != "SUMMARY.md"
+        ]
+        full_updated_files=apply_unified_diff(original_files_map, diffs_only)
         response_blocks = []
         for path, content_text in full_updated_files.items():
             lang = ""
@@ -642,6 +661,8 @@ async def edit_code(req: EditRequest):
             response_blocks.append(block)
         
         final_content = "\n\n".join(response_blocks)
+        if summary_md:
+            final_content += f"\n\n#### SUMMARY.md\n```markdown\n{summary_md}\n```"
         return Response(content=final_content, media_type="text/markdown")
 
     except Exception as e:

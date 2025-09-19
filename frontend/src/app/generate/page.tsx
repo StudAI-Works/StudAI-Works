@@ -18,10 +18,12 @@ import "react-toastify/dist/ReactToastify.css";
 import { useTheme } from "next-themes";
 import { Send, Sparkles, Code, Eye, Copy, Download, ImageIcon, FileText, Calculator, User, Layout, Database, Globe, Smartphone, Folder, FolderOpen, File as FileIcon, ChevronRight, ChevronDown, Wand2, Bug } from "lucide-react";
 import { Header } from "@/components/header";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole  } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
@@ -169,7 +171,9 @@ export default function GeneratePage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   type Phase = 'refine' | 'generated'
   const [phase, setPhase] = useState<Phase>('refine')
-
+  const [projectTitle, setProjectTitle] = useState<string>("Untitled Project");
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [error, setError] = useState<string | null>(null)
   const { user, token, logout } = useAuth();
   const { theme } = useTheme();
   const [hasError, setHasError] = useState(false);
@@ -180,6 +184,7 @@ export default function GeneratePage() {
     setLastError(errorMessage || "");
   }, [hasError, lastError]);
 
+  const navigate = useNavigate();
   // Allow overriding backend URL via Vite env, fallback to localhost
   const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
 
@@ -877,6 +882,11 @@ export default fallbackFunction;`;
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const pid = params.get('project');
+    const rawTitle = params.get('title');
+    const title = rawTitle !== null ? decodeURIComponent(rawTitle) : null;
+
+    console.log(title)
+    if(title) setProjectTitle(title);
     if (!pid) return;
     (async () => {
       try {
@@ -924,15 +934,6 @@ export default fallbackFunction;`;
     return parts.join('\n\n---\n\n');
   };
 
-
-  // Load the last project id for this user so we keep versioning
-  useEffect(() => {
-    if (user?.id) {
-      const key = `StudAI:lastProjectId:${user.id}`;
-      const last = localStorage.getItem(key);
-      if (last) setProjectId(last);
-    }
-  }, [user?.id]);
 
   const fixPath = (path: string): string => {
     // Fix common frontend root-level files
@@ -1037,26 +1038,6 @@ export default fallbackFunction;`;
 
       toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
       // Create a blank project early if none exists to avoid RLS issues on first save
-      try {
-        if (!projectId) {
-          const pres = await fetch(`${BASE_URL}/api/projects`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ title: 'Untitled Project' })
-          });
-          if (pres.ok) {
-            const pdata = await pres.json();
-            if (pdata?.project_id) {
-              setProjectId(pdata.project_id);
-              if (user?.id) {
-                localStorage.setItem(`StudAI:lastProjectId:${user.id}`, pdata.project_id);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Pre-create project failed (non-fatal):', e);
-      }
       return data.session_id;
     } catch (err: any) {
       toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
@@ -1066,18 +1047,22 @@ export default fallbackFunction;`;
   const saveProjectIfNeeded = async (): Promise<string | null> => {
     try {
       if (!fullMarkdown) return projectId;
-      const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
       const targetId = projectId || 'new';
+            if(!projectTitle || projectTitle==="Untitled Project") {
+        const pt=prompt("Please provide a title for your project", projectTitle);
+        if(!pt) return null;
+        setProjectTitle(pt);
+      }
       let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+        body: JSON.stringify({ markdown: fullMarkdown, title: projectTitle})
       });
       if (res.status === 404 && targetId !== 'new') {
         res = await fetch(`${BASE_URL}/api/projects/new/save`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
+          body: JSON.stringify({ markdown: fullMarkdown, title: projectTitle })
         });
       }
       if (!res.ok) return projectId;
@@ -1118,16 +1103,23 @@ export default fallbackFunction;`;
       const data = await res.json();
       console.log('Edit response', data);
       const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
+      let summary=intent === 'fix' ? 'Applied fix to your reported error.' : 'Applied the requested edits.';
       if (arts.length > 0) {
         const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
-        setGeneratedFiles(files);
+        const summaryFiles = files.filter(f => f.path.trim().toLowerCase() === "summary.md");
+        if (summaryFiles.length > 0) {
+        summary = summaryFiles[0].content;
+        }
+        const filesWithoutSummary = files.filter(f => f.path.trim().toLowerCase() !== "summary.md");
+        console.log("Applying files", filesWithoutSummary); 
+        setGeneratedFiles(filesWithoutSummary);
         setSandpackKey(Date.now());
-        setFileTree(buildFileTree(files));
-        setSelectedFile(files.find(f => f.path === selectedFile?.path) || files[0] || null);
-        setFullMarkdown(filesToMarkdown(files));
+        setFileTree(buildFileTree(filesWithoutSummary));
+        setSelectedFile(filesWithoutSummary.find(f => f.path === selectedFile?.path) || files[0] || null);
+        setFullMarkdown(filesToMarkdown(filesWithoutSummary));
       }
       toast.update(tId, { render: intent === 'fix' ? `Fix applied (v${data.version})` : `Edit applied (v${data.version})`, type: 'success', isLoading: false, autoClose: 2500 });
-      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: intent === 'fix' ? 'Applied fix to your reported error.' : 'Applied the requested edits.', timestamp: new Date() }]);
+      setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: summary, timestamp: new Date() }]);
     } catch (e: any) {
       toast.update(tId, { render: `Edit failed: ${e.message}`, type: 'error', isLoading: false, autoClose: 4000 });
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Edit failed: ${e.message}`, timestamp: new Date() }]);
@@ -1248,35 +1240,80 @@ export default fallbackFunction;`;
     }
   };
 
-  const handleSaveProject = async () => {
-    if (!fullMarkdown) {
-      toast.error("Nothing to save yet");
+const handleSaveProject = async () => {
+  if (!fullMarkdown) {
+    toast.error("Nothing to save yet");
+    return;
+  }
+  console.log('Saving project', projectId, projectTitle);
+    // If no valid title, prompt the user to enter one
+    if (!projectTitle || projectTitle === "Untitled Project" || !projectTitle.trim()) {
+    setShowProjectModal(true);
+    setError("Please enter a project name");
+    return;
+  }
+  setError(null);
+
+  const loadingToastId = toast.loading("Saving project...");
+  try {
+    const targetId = projectId || 'new';
+    console.log('Saving to project ID:', targetId,projectTitle);
+    let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ markdown: fullMarkdown, title: projectTitle })
+    });
+    const targetUrl = `/generate?project=${targetId}&title=${encodeURIComponent(projectTitle)}`;
+    if ((location.pathname + location.search) !== targetUrl) {
+    navigate(targetUrl);
+    }
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const data = await res.json();
+    if (data.project_id) {
+      setProjectId(data.project_id);
+      if (user?.id) {
+        localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
+      }
+    }
+    toast.update(loadingToastId, { render: `Saved! Project ${data.project_id}, v${data.version}`, type: "success", isLoading: false, autoClose: 3000 });
+  } catch (err) {
+    toast.update(loadingToastId, { render: `Save failed: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+  }
+};
+
+  const projectModal = (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-full shadow-lg">
+        <h2 className="text-xl font-semibold mb-4">Name Your Project</h2>
+        <input
+          type="text"
+          placeholder="Enter project name"
+          value={projectTitle}
+          onChange={(e) => setProjectTitle(e.target.value)}
+          className="w-full border border-gray-300 rounded px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {error && <p className="text-red-500 mb-2">{error}</p>}
+        <div className="flex justify-end space-x-4">
+          <Button variant="outline" onClick={() => setShowProjectModal(false)}>
+            Cancel
+          </Button>
+          <Button
+  onClick={() => {
+    if (!projectTitle.trim()) {
+      setError("Please enter a project name");
       return;
     }
-    const loadingToastId = toast.loading("Saving project...");
-    try {
-      // Derive a simple title from the first heading or fallback
-      const firstHeading = (fullMarkdown.match(/^##\s+(.+)$/m)?.[1] || "Untitled Project").slice(0, 80);
-      // Use existing project id if present, otherwise create new
-      const targetId = projectId || 'new';
-      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
-      });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      if (data.project_id) {
-        setProjectId(data.project_id);
-        if (user?.id) {
-          localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
-        }
-      }
-      toast.update(loadingToastId, { render: `Saved! Project ${data.project_id}, v${data.version}`, type: "success", isLoading: false, autoClose: 3000 });
-    } catch (err: any) {
-      toast.update(loadingToastId, { render: `Save failed: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
-    }
-  };
+    setShowProjectModal(false);
+    setError(null);
+    handleSaveProject();  
+  }}
+>
+  Save
+</Button>
+        </div>
+      </div>
+    </div>
+  );
 
   const handleCodeEdit = (newCode: string | undefined) => {
     if (selectedFile && newCode !== undefined) {
@@ -1600,7 +1637,11 @@ export default fallbackFunction;`;
                             </div>
                           ) : (
                             <>
-                              <p className="whitespace-pre-wrap">{message.content}</p>
+                              <div className="whitespace-pre-wrap">
+                          <ReactMarkdown  remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                          </div>
                               <div className="text-xs opacity-70 mt-2">
                                 {new Date(message.timestamp).toLocaleTimeString()}
                               </div>
@@ -1827,6 +1868,7 @@ export default fallbackFunction;`;
 
         )}
       </main>
+      {showProjectModal && projectModal}
     </div>
   );
 }
