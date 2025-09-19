@@ -1,8 +1,12 @@
 // file: src/pages/GeneratePage.tsx
 "use client";
 
-import { useState, useRef, useEffect, useMemo ,useCallback} from "react";
-import { cn } from "@/lib/utils";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+
+// Utility function to concatenate class names
+function cn(...classes: (string | undefined | false | null)[]) {
+  return classes.filter(Boolean).join(' ');
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,10 +22,11 @@ import { Navigate, useLocation } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useAuth } from "../context/authContext";
-import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole  } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor, useSandpack, useSandpackConsole } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
+import { ChatWidget } from "@/components/chat-widget";
 
 
 
@@ -64,7 +69,7 @@ const ErrorListener = ({
   useEffect(() => {
     const errorMessages = logs
       .filter((log) => log.method === "error" && Array.isArray(log.data) && log.data.length > 0)
-      .flatMap((log) => log.data.map(e => (e instanceof Error ? e.message : String(e))));
+      .flatMap((log) => (log.data || []).map(e => (e instanceof Error ? e.message : String(e))));
 
     const foundError = errorMessages.length > 0;
 
@@ -89,7 +94,6 @@ const ErrorListener = ({
 
   return null;
 };
-
 // Constant Arrays
 const quickActions = [
   { icon: ImageIcon, label: "Clone a Screenshot", description: "Upload an image to recreate" },
@@ -100,12 +104,6 @@ const quickActions = [
   { icon: Database, label: "CRUD App", description: "Full-stack data management" },
   { icon: Globe, label: "Portfolio Site", description: "Personal or business portfolio" },
   { icon: Smartphone, label: "Mobile App UI", description: "Responsive mobile interface" },
-];
-const starterTemplates = [
-  { name: "Website Template", description: "A ready-made site you can customize without coding.", icon: "🌐", color: "bg-blue-500 text-white" },
-  { name: "Blog Template", description: "Quickly start a blog — just change text and images.", icon: "📝", color: "bg-green-500 text-white" },
-  { name: "Online Store", description: "Launch your own online shop in minutes.", icon: "🛍️", color: "bg-pink-500 text-white" },
-  { name: "Portfolio", description: "Showcase your work in a professional layout.", icon: "🎨", color: "bg-purple-500 text-white" },
 ];
 
 // Boilerplate HTML
@@ -164,25 +162,23 @@ export default function GeneratePage() {
   const [fullMarkdown, setFullMarkdown] = useState<string>("");
   // Track saved project id to create new versions on subsequent saves
   const [projectId, setProjectId] = useState<string | null>(null);
+  // Edit prompt
   const [sandpackKey, setSandpackKey] = useState(Date.now());
   const [editText, setEditText] = useState<string>("");
-  // const [isLoadingHistory, setIsLoadingHistory] = useState(true); // Commented out - unused
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const { user, token, logout } = useAuth();
-  const { theme } = useTheme();
   type Phase = 'refine' | 'generated'
   const [phase, setPhase] = useState<Phase>('refine')
 
+  const { user, token, logout } = useAuth();
+  const { theme } = useTheme();
+  const [hasError, setHasError] = useState(false);
+  const [lastError, setLastError] = useState<string>("");
 
-const [hasError, setHasError] = useState(false);
-const [lastError, setLastError] = useState<string>("");
-
-const handleErrorChange = useCallback((hasError: boolean, errorMessage: string | null) => {
-  setHasError(hasError);
-  setLastError(errorMessage || "");
-}, [hasError, lastError]);
-
+  const handleErrorChange = useCallback((hasError: boolean, errorMessage: string | null) => {
+    setHasError(hasError);
+    setLastError(errorMessage || "");
+  }, [hasError, lastError]);
 
   // Allow overriding backend URL via Vite env, fallback to localhost
   const BASE_URL = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:8080";
@@ -1024,7 +1020,7 @@ export default fallbackFunction;`;
   const startConversation = async () => {
     const loadingToastId = toast.loading("Starting conversation...");
     try {
-      const res = await fetch(`${BASE_URL}/api/start-conversation`, {
+      const res = await fetch(`${BASE_URL}/start-conversation`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -1040,18 +1036,33 @@ export default fallbackFunction;`;
       // await storeChatMessage(data.message, 'assistant');
 
       toast.update(loadingToastId, { render: "Conversation started!", type: "success", isLoading: false, autoClose: 2000 });
+      // Create a blank project early if none exists to avoid RLS issues on first save
+      try {
+        if (!projectId) {
+          const pres = await fetch(`${BASE_URL}/api/projects`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ title: 'Untitled Project' })
+          });
+          if (pres.ok) {
+            const pdata = await pres.json();
+            if (pdata?.project_id) {
+              setProjectId(pdata.project_id);
+              if (user?.id) {
+                localStorage.setItem(`StudAI:lastProjectId:${user.id}`, pdata.project_id);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Pre-create project failed (non-fatal):', e);
+      }
       return data.session_id;
     } catch (err: any) {
-      const errorMessage = `Error: ${err.message}`;
-
-      // Store error message in history
-      // await storeChatMessage(errorMessage, 'error');
-
-      toast.update(loadingToastId, { render: errorMessage, type: "error", isLoading: false, autoClose: 4000 });
+      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
     }
   };
 
-  
   const saveProjectIfNeeded = async (): Promise<string | null> => {
     try {
       if (!fullMarkdown) return projectId;
@@ -1162,10 +1173,16 @@ export default fallbackFunction;`;
   };
 
   const handleGenerateCode = async () => {
-    const sessionid = localStorage.getItem("sessionid");
+    // Ensure a session exists or create one on the fly
+    let sessionid = sessionId || localStorage.getItem("sessionid");
     if (!sessionid) {
-      toast.error("No active conversation session");
-      return;
+      sessionid = await startConversation();
+      if (!sessionid) {
+        toast.error("Couldn't start a conversation");
+        return;
+      }
+      localStorage.setItem("sessionid", sessionid);
+      setSessionId(sessionid);
     }
 
     setIsGenerating(true);
@@ -1176,7 +1193,7 @@ export default fallbackFunction;`;
     const loadingToastId = toast.loading("Generating code...");
 
     try {
-      const response = await fetch(`http://localhost:8000/generate`, {
+      const response = await fetch(`${BASE_URL}/api/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ session_id: sessionid }),
@@ -1214,6 +1231,7 @@ export default fallbackFunction;`;
         }
       }
       setFullMarkdown(responseText);
+      // Move into post-generation phase and ensure a project exists for subsequent edits
       setPhase('generated');
       await saveProjectIfNeeded();
       toast.update(loadingToastId, { render: "Code generated!", type: "success", isLoading: false, autoClose: 2000 });
@@ -1246,14 +1264,6 @@ export default fallbackFunction;`;
         headers: getAuthHeaders(),
         body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
       });
-      // If the project id doesn't exist (e.g., DB was reset), fallback to creating a new project
-      if (res.status === 404) {
-        res = await fetch(`${BASE_URL}/api/projects/new/save`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ markdown: fullMarkdown, title: firstHeading })
-        });
-      }
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.project_id) {
@@ -1268,7 +1278,6 @@ export default fallbackFunction;`;
     }
   };
 
-
   const handleCodeEdit = (newCode: string | undefined) => {
     if (selectedFile && newCode !== undefined) {
       const updatedFiles = generatedFiles.map(file => file.path === selectedFile.path ? { ...file, content: newCode } : file);
@@ -1278,7 +1287,7 @@ export default fallbackFunction;`;
   };
 
   const handleQuickAction = (action: string) => {
-    startConversation().then(() => handleSend(`Create a ${action}`));
+    handleSend(`Create a ${action}`);
   };
 
   const copyCode = () => {
@@ -1410,34 +1419,22 @@ export default fallbackFunction;`;
       await historyService.storeFile(content, fileName, fileType);
     } catch (error) {
       console.error('Failed to store generated file:', error);
-      toast.error('Failed to save file to history');
     }
   };
 
   // Load chat history when component mounts
   useEffect(() => {
     const loadChatHistory = async () => {
-      // setIsLoadingHistory(true); // Commented out since variable is unused
+      setIsLoadingHistory(true);
       try {
-        const history = await historyService.getChatHistory();
-
-        // Convert history items to the message format used in the component
-        const formattedMessages = history.map(msg => ({
-          id: msg.id || Date.now().toString(),
-          type: msg.role as 'user' | 'assistant' | 'error',
-          content: msg.message,
-          timestamp: new Date(msg.created_at)
-        }));
-
-        // Sort messages by timestamp ascending (oldest first)
-        formattedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-
-        setMessages(formattedMessages);
+        // Remove chat history functionality - no longer loading chat messages
+        // Just set empty messages array
+        setMessages([]);
       } catch (error) {
         console.error('Failed to load chat history:', error);
         toast.error('Failed to load chat history');
       } finally {
-        // setIsLoadingHistory(false); // Commented out since variable is unused
+        setIsLoadingHistory(false);
       }
     };
 
@@ -1491,6 +1488,8 @@ export default fallbackFunction;`;
         <Header user={headerUser} onLogout={logout} />
       </div>
 
+      <ChatWidget />
+
       {/* Main Content */}
       <main className="flex-1 min-h-0">
         {messages.length === 0 && generatedFiles.length === 0 ? (
@@ -1540,40 +1539,26 @@ export default fallbackFunction;`;
                     ))}
                   </div>
                 </div>
-                <div className="mb-12">
-                  <h2 className="text-2xl font-bold mb-4">Starter Templates</h2>
-                  <div className="grid md:grid-cols-4 gap-4">
-                    {starterTemplates.map((template) => (
-                      <Card key={template.name} className="cursor-pointer hover:shadow-lg transition-shadow">
-                        <CardContent className="p-6">
-                          <div className={`w-12 h-12 rounded-lg ${template.color} flex items-center justify-center text-2xl mb-4`}>
-                            {template.icon}
-                          </div>
-                          <h3 className="font-semibold mb-2">{template.name}</h3>
-                          <p className="text-sm text-muted-foreground">{template.description}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           </ScrollArea>
         ) : (
           // Chat Interface with Messages
           <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+            {/* ---------- Left Panel (AI Assistant) ---------- */}
             <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
               <div className="h-full flex flex-col">
+                {/* Header */}
                 <div className="border-b p-4 flex-shrink-0">
                   <h2 className="font-semibold flex items-center">
-                    <Sparkles className="mr-2 h-5 w-5 text-primary" />AI Assistant
+                    <Sparkles className="mr-2 h-5 w-5 text-primary" /> AI Assistant
                   </h2>
                   <Button
                     variant="outline"
                     size="sm"
                     className="mt-2"
                     onClick={handleGenerateCode}
-                    disabled={isGenerating || !sessionId}
+                    disabled={isGenerating}
                   >
                     Generate Code
                   </Button>
@@ -1588,10 +1573,15 @@ export default fallbackFunction;`;
                   </Button>
                 </div>
 
-                <div className="flex-1">
-                  <div className="p-4 space-y-6 max-h-screen overflow-y-scroll">
+                {/* Chat Scroll Area */}
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-6">
                     {messages.map((message) => (
-                      <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        key={message.id}
+                        className={`flex ${message.type === "user" ? "justify-end" : "justify-start"
+                          }`}
+                      >
                         <div
                           className={cn(
                             "max-w-[80%] rounded-lg p-4",
@@ -1632,15 +1622,17 @@ export default fallbackFunction;`;
                     )}
                   </div>
                   <div ref={messagesEndRef} />
-                </div>
+                </ScrollArea>
 
+                {/* Input Area */}
                 <div className="border-t p-4 flex-shrink-0">
                   <div className="relative">
                     <Textarea
                       placeholder="Describe what to build or modify..."
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                       className={`min-h-[60px] resize-none ${(!hasError || isGenerating) ? 'pr-12' : 'pr-36'}`}
+                      className={`min-h-[60px] resize-none ${!hasError || isGenerating ? "pr-12" : "pr-36"
+                        }`}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -1649,27 +1641,29 @@ export default fallbackFunction;`;
                       }}
                     />
                     <div className="absolute bottom-3 right-3 flex flex-row gap-2">
-            <Button
-              variant="secondary"
-              onClick={async () => {
-                if (lastError.trim()) {
-                  await applyEditFromChat(`Refine the code to fix the following error:\n${lastError}`);
-                }
-              }}
-              className={hasError && !isGenerating ? "inline-flex" : "hidden"}
-              size="sm"
-            >
-              <Bug className="h-4 w-4 mr-1" /> {hasError ? 'Fix Error' : 'No Errors'}
-            </Button>
-            <Button
-              size="icon"
-              onClick={() => handleSend()}
-              disabled={!input.trim() || isGenerating}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-
+                      <Button
+                        variant="secondary"
+                        onClick={async () => {
+                          if (lastError.trim()) {
+                            await applyEditFromChat(
+                              `Refine the code to fix the following error:\n${lastError}`
+                            );
+                          }
+                        }}
+                        className={hasError && !isGenerating ? "inline-flex" : "hidden"}
+                        size="sm"
+                      >
+                        <Bug className="h-4 w-4 mr-1" />{" "}
+                        {hasError ? "Fix Error" : "No Errors"}
+                      </Button>
+                      <Button
+                        size="icon"
+                        onClick={() => handleSend()}
+                        disabled={!input.trim() || isGenerating}
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1677,37 +1671,76 @@ export default fallbackFunction;`;
 
             <ResizableHandle withHandle />
 
+            {/* ---------- Right Panel (Code & Preview) ---------- */}
             <ResizablePanel defaultSize={70} minSize={30}>
               <div className="h-full flex flex-col">
-                <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex-1 flex flex-col min-h-0">
+                <Tabs
+                  value={selectedTab}
+                  onValueChange={setSelectedTab}
+                  className="flex-1 flex flex-col min-h-0"
+                >
+                  {/* Tabs Header */}
                   <div className="border-b p-2 flex items-center justify-between flex-shrink-0">
                     <TabsList>
-                      <TabsTrigger value="code"><Code className="mr-2 h-4 w-4" />Code</TabsTrigger>
-                      <TabsTrigger value="preview"><Eye className="mr-2 h-4 w-4" />Preview</TabsTrigger>
+                      <TabsTrigger value="code">
+                        <Code className="mr-2 h-4 w-4" />
+                        Code
+                      </TabsTrigger>
+                      <TabsTrigger value="preview">
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview
+                      </TabsTrigger>
                     </TabsList>
                     <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm" onClick={copyCode} disabled={!selectedFile}><Copy className="mr-2 h-4 w-4" />Copy</Button>
-                      <Button variant="outline" size="sm" onClick={downloadZip} disabled={generatedFiles.length === 0}><Download className="mr-2 h-4 w-4" />Download ZIP</Button>
-                      {selectedTab === 'preview' && sandpackConfig.files && Object.keys(sandpackConfig.files).length > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={openInCodeSandbox}
-                        >
-                          <Globe className="mr-2 h-4 w-4" />Open in CodeSandbox
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyCode}
+                        disabled={!selectedFile}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={downloadZip}
+                        disabled={generatedFiles.length === 0}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download ZIP
+                      </Button>
+                      {selectedTab === "preview" &&
+                        sandpackConfig.files &&
+                        Object.keys(sandpackConfig.files).length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={openInCodeSandbox}
+                          >
+                            <Globe className="mr-2 h-4 w-4" />
+                            Open in CodeSandbox
+                          </Button>
+                        )}
                     </div>
                   </div>
 
+                  {/* Code Editor Tab */}
                   <TabsContent value="code" className="flex-1 flex flex-col min-h-0">
                     <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+                      {/* File Explorer */}
                       <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
                         <div className="h-full border-r bg-muted/20 flex flex-col min-h-0">
-                          <div className="p-2 border-b flex-shrink-0"><h3 className="font-semibold text-sm">File Explorer</h3></div>
+                          <div className="p-2 border-b flex-shrink-0">
+                            <h3 className="font-semibold text-sm">File Explorer</h3>
+                          </div>
                           <ScrollArea className="flex-1 p-2 min-h-0">
                             {fileTree.length > 0 ? (
-                              <div className="space-y-1">{fileTree.map((node) => (<FileTreeItem key={node.path} node={node} />))}</div>
+                              <div className="space-y-1">
+                                {fileTree.map((node) => (
+                                  <FileTreeItem key={node.path} node={node} />
+                                ))}
+                              </div>
                             ) : (
                               <div className="text-center py-8 text-muted-foreground text-sm">
                                 <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -1717,48 +1750,72 @@ export default fallbackFunction;`;
                           </ScrollArea>
                         </div>
                       </ResizablePanel>
+
                       <ResizableHandle withHandle />
+
+                      {/* Code Editor */}
                       <ResizablePanel defaultSize={75}>
                         <div className="h-full min-h-0">
                           <Editor
                             height="100%"
-                            language={selectedFile ? getLanguage(selectedFile.path) : 'plaintext'}
-                            value={selectedFile?.content ?? "// Select a file to view and edit its content"}
-                            theme={theme === 'dark' ? 'vs-dark' : 'light'}
+                            language={
+                              selectedFile ? getLanguage(selectedFile.path) : "plaintext"
+                            }
+                            value={
+                              selectedFile?.content ??
+                              "// Select a file to view and edit its content"
+                            }
+                            theme={theme === "dark" ? "vs-dark" : "light"}
                             onChange={handleCodeEdit}
-                            options={{ minimap: { enabled: false }, wordWrap: "on", fontSize: 14, scrollBeyondLastLine: false }}
+                            options={{
+                              minimap: { enabled: false },
+                              wordWrap: "on",
+                              fontSize: 14,
+                              scrollBeyondLastLine: false,
+                            }}
                           />
                         </div>
                       </ResizablePanel>
                     </ResizablePanelGroup>
                   </TabsContent>
 
+                  {/* Preview Tab */}
                   <TabsContent value="preview" className="flex-1 p-0 m-0 min-h-0">
-                    {selectedTab === 'preview' && (
+                    {selectedTab === "preview" && (
                       <SandpackProvider
-                      key={sandpackKey} 
+                        key={sandpackKey}
                         files={sandpackConfig.files}
                         template="react-ts"
                         customSetup={{
                           entry: sandpackConfig.entry,
                           dependencies: {
-                            'react': "^18.2.0",
+                            react: "^18.2.0",
                             "react-dom": "^18.2.0",
                             "react-router-dom": "^6.22.3",
-                            'tailwindcss': "^3.4.1",
-                            'axios': "^1.11.0",
+                            tailwindcss: "^3.4.1",
+                            axios: "^1.11.0",
                             "react-icons": "^5.5.0",
-                            "zustand": "^5.0.0",
-                            "date-fns": "^1.0.0"
-                          }
+                            zustand: "^5.0.0",
+                            "date-fns": "^1.0.0",
+                          },
                         }}
                       >
-                        <ErrorListener onErrorChange={handleErrorChange} onFix={function (errorMessage: string): void {
-                            throw new Error("Function not implemented.");
-                          } } />
-                        <SandpackLayout style={{ height: "100%", minHeight: 0 }} className="flex-1 min-h-0">
-                          {/* <SandpackCodeEditor style={{ height: "calc(100vh - 240px)" }} /> */}
-                          <SandpackPreview style={{ height: "calc(100vh - 240px)" }} />
+                        <ErrorListener
+                          onErrorChange={handleErrorChange}
+                          onFix={(errorMessage: string) => {
+                            console.error("Fix handler not implemented", errorMessage);
+                          }}
+                        />
+                        <SandpackLayout
+                          style={{ height: "100%", minHeight: 0 }}
+                          className="flex-1 min-h-0"
+                        >
+                          {/* <SandpackCodeEditor
+                            style={{ height: "calc(100vh - 240px)" }}
+                          /> */}
+                          <SandpackPreview
+                            style={{ height: "calc(100vh - 240px)" }}
+                          />
                         </SandpackLayout>
                       </SandpackProvider>
                     )}
@@ -1767,6 +1824,7 @@ export default fallbackFunction;`;
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
+
         )}
       </main>
     </div>

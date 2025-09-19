@@ -1,4 +1,4 @@
-// import React from 'react'; // Not needed with new JSX transform
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // Import Pages
@@ -9,11 +9,10 @@ import AccountPage from './app/account/page';
 import EditorPage from './app/editor/page';
 import GeneratePage from './app/generate/page';
 import HelpPage from './app/help/page';
-import OrganizationPage from './app/organization/page';
 
 // Import Providers and Guards
 import { AuthProvider } from './app/context/authContext';
-import { ThemeProvider } from './components/theme-provider';
+import { ThemeProvider } from './components/theme-provider'; 
 import ProtectedRoute from './components/protectedRoute';
 import PublicRoute from './components/publicRoutes';
 import Admin from './app/account/admin';
@@ -40,9 +39,8 @@ function App() {
               <Route path='/editor' element={<EditorPage />} />
               <Route path='/generate' element={<GeneratePage />} />
               <Route path='/help' element={<HelpPage />} />
-              <Route path='/studaiadmin' element={<Admin />} />
-
-              <Route path='/organization' element={<OrganizationPage />} />
+              <Route path='/studaiadmin' element={<Admin/>} />
+              
             </Route>
             <Route path='*' element={<Navigate to="/" replace />} />
           </Routes>

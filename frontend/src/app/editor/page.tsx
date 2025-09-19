@@ -25,6 +25,7 @@ import {
   Eye,
 } from "lucide-react"
 import { Header } from "@/components/header"
+import { ChatWidget } from "@/components/chat-widget"
 
 const mockFiles = [
   {
@@ -88,19 +89,19 @@ export default App`
 
 export default function EditorPage() {
   const [isRunning, setIsRunning] = useState(false);
-const [projectName, setProjectName] = useState("My Awesome Project");
-const [saveStatus, setSaveStatus] = useState("saved");
-const { user, logout } = useAuth();
+  const [projectName, setProjectName] = useState("My Awesome Project");
+  const [saveStatus, setSaveStatus] = useState("saved");
+  const { user, logout } = useAuth();
 
-if (!user) {
-  return <Navigate to="/auth" replace />;
-}
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
-const headerUser = {
-  name: user.fullName,
-  email: user.email,
-  avatar: "/placeholder.svg?height=32&width=32",
-};
+  const headerUser = {
+    name: user.fullName,
+    email: user.email,
+    avatar: "/placeholder.svg?height=32&width=32",
+  };
 
   const handleRun = () => {
     setIsRunning(!isRunning)
@@ -116,6 +117,8 @@ const headerUser = {
 
     return (
       <div>
+        <ChatWidget />
+
         <div
           className="flex items-center space-x-2 py-1 px-2 hover:bg-muted/50 cursor-pointer rounded text-sm"
           style={{ paddingLeft: `${level * 12 + 8}px` }}

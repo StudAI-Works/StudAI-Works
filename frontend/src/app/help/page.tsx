@@ -1,3 +1,5 @@
+
+
 "use client"
 
 import type React from "react"
@@ -17,15 +19,15 @@ import {
   Search,
   MessageCircle,
   Book,
-  // Video,
+  Video,
   Mail,
   Phone,
   Clock,
   CheckCircle,
   HelpCircle,
-  // FileText,
-  // Zap,
-  // Code,
+  FileText,
+  Zap,
+  Code,
   AlertCircle,
   TrendingUp,
 } from "lucide-react"
@@ -43,6 +45,7 @@ const knowledgeBase = [
     tags: ["ai", "code generation", "tutorial", "beginner"],
     readTime: "5 min",
     popularity: 95,
+    pdf: "/Getting_Started_with_AI_Code_Generation.pdf",
   },
   {
     id: 2,
@@ -52,15 +55,7 @@ const knowledgeBase = [
     tags: ["deployment", "vercel", "netlify", "railway"],
     readTime: "8 min",
     popularity: 88,
-  },
-  {
-    id: 3,
-    title: "Setting Up Team Collaboration",
-    category: "Collaboration",
-    content: "Create organizations, invite team members, and manage permissions for collaborative development.",
-    tags: ["team", "collaboration", "organization", "permissions"],
-    readTime: "6 min",
-    popularity: 82,
+    pdf: "/Deploying_Your_First_Project.pdf",
   },
   {
     id: 4,
@@ -70,6 +65,7 @@ const knowledgeBase = [
     tags: ["database", "supabase", "firebase", "neon", "upstash"],
     readTime: "10 min",
     popularity: 90,
+    pdf: "/Integrating_with_Databases.pdf",
   },
   {
     id: 5,
@@ -79,6 +75,7 @@ const knowledgeBase = [
     tags: ["advanced", "customization", "optimization", "best practices"],
     readTime: "12 min",
     popularity: 75,
+    pdf: "/Advanced_Customization_Tips.pdf",
   },
   {
     id: 6,
@@ -88,6 +85,7 @@ const knowledgeBase = [
     tags: ["api", "documentation", "integration", "reference"],
     readTime: "15 min",
     popularity: 70,
+    pdf: "/API_Reference_Documentation.pdf",
   },
   {
     id: 7,
@@ -97,6 +95,7 @@ const knowledgeBase = [
     tags: ["troubleshooting", "errors", "debugging", "solutions"],
     readTime: "7 min",
     popularity: 85,
+    pdf: "/Troubleshooting_Common_Issues.pdf",
   },
   {
     id: 8,
@@ -106,8 +105,10 @@ const knowledgeBase = [
     tags: ["themes", "styling", "customization", "css", "tailwind"],
     readTime: "9 min",
     popularity: 78,
+    pdf: "/Theme_Customization_Guide.pdf",
   },
 ]
+
 
 const faqs = [
   {
@@ -135,11 +136,7 @@ const faqs = [
     answer:
       "Our AI analyzes your natural language description and generates production-ready code with proper structure, styling, and functionality. It creates blueprints first, then generates the actual code with live preview.",
   },
-  {
-    question: "Can I collaborate with my team?",
-    answer:
-      "Create an organization, invite team members, and collaborate on projects in real-time. You can assign different roles and permissions to team members.",
-  },
+
 ]
 
 const supportChannels = [
@@ -173,83 +170,36 @@ const supportChannels = [
   },
 ]
 
-// const resources = [
-//   {
-//     icon: Video,
-//     title: "Video Tutorials",
-//     description: "Step-by-step video guides",
-//     count: "50+ videos",
-//   },
-//   {
-//     icon: FileText,
-//     title: "API Documentation",
-//     description: "Complete API reference",
-//     count: "Full reference",
-//   },
-//   {
-//     icon: Code,
-//     title: "Code Examples",
-//     description: "Ready-to-use code snippets",
-//     count: "100+ examples",
-//   },
-//   {
-//     icon: Zap,
-//     title: "Quick Start Guide",
-//     description: "Get up and running in minutes",
-//     count: "5 min read",
-//   },
-// ]
-
-// System Status Data
-const systemStatus = {
-  overall: "operational",
-  lastUpdated: new Date(),
-  services: [
-    { name: "AI Code Generation", status: "operational", uptime: "99.9%", responseTime: "120ms" },
-    { name: "Project Editor", status: "operational", uptime: "99.8%", responseTime: "85ms" },
-    { name: "Deployment Services", status: "operational", uptime: "99.7%", responseTime: "200ms" },
-    { name: "Database Connections", status: "operational", uptime: "99.9%", responseTime: "95ms" },
-    { name: "Authentication", status: "operational", uptime: "100%", responseTime: "45ms" },
-    { name: "File Storage", status: "operational", uptime: "99.8%", responseTime: "110ms" },
-  ],
-  incidents: [
-    // {
-    //   id: 1,
-    //   title: "Scheduled Maintenance - Database Optimization",
-    //   status: "completed",
-    //   date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    //   description: "Routine database optimization completed successfully.",
-    // },
-    // {
-    //   id: 2,
-    //   title: "Minor Deployment Delays",
-    //   status: "resolved",
-    //   date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    //   description: "Brief delays in deployment services have been resolved.",
-    // },
-  ],
+const categoryPdfMap: Record<string, string> = {
+  "Getting Started": "/Getting_Started_with_AI_Code_Generation.pdf",
+  "Deployment": "/Deploying_Your_First_Project.pdf",
+  "Database": "/Integrating_with_Databases.pdf",
+  "Advanced": "/Advanced_Customization_Tips.pdf",
+  "API": "/API_Reference_Documentation.pdf",
+  "Troubleshooting": "/Troubleshooting_Common_Issues.pdf",
+  "Customization": "/Theme_Customization_Guide.pdf",
 }
 
 export default function HelpPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [ticketForm, setTicketForm] = useState({
-    subject: "",
-    category: "general",
-    priority: "medium",
-    description: "",
-  });
-  const { user, logout } = useAuth();
+const [selectedCategory, setSelectedCategory] = useState("all");
+const [ticketForm, setTicketForm] = useState({
+  subject: "",
+  category: "general",
+  priority: "medium",
+  description: "",
+});
+const { user, logout } = useAuth();
 
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
+if (!user) {
+  return <Navigate to="/auth" replace />;
+}
 
-  const headerUser = {
-    name: user.fullName,
-    email: user.email,
-    avatar: "/placeholder.svg?height=32&width=32",
-  };
+const headerUser = {
+  name: user.fullName,
+  email: user.email,
+  avatar: "/placeholder.svg?height=32&width=32",
+};
 
   // Knowledge Base Search
   const filteredKnowledge = knowledgeBase.filter((item) => {
@@ -343,12 +293,10 @@ export default function HelpPage() {
             </div>
 
             <Tabs defaultValue="knowledge" className="space-y-8">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
                 <TabsTrigger value="faq">FAQ</TabsTrigger>
                 <TabsTrigger value="support">Contact Support</TabsTrigger>
-                {/* <TabsTrigger value="resources">Resources</TabsTrigger> */}
-                <TabsTrigger value="status">System Status</TabsTrigger>
               </TabsList>
 
               {/* Knowledge Base Tab */}
@@ -356,21 +304,33 @@ export default function HelpPage() {
                 <div className="flex flex-wrap gap-2 mb-6">
                   {categories.map((category) => (
                     <Button
-                      key={category}
-                      variant={selectedCategory === category ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedCategory(category)}
-                      className="capitalize"
-                    >
-                      {category}
-                    </Button>
+  key={category}
+  variant={selectedCategory === category ? "default" : "outline"}
+  size="sm"
+  onClick={() => {
+    const pdf = categoryPdfMap[category]
+    if (pdf) {
+      window.open(pdf, "_blank")  // open PDF in new tab
+    } else {
+      setSelectedCategory(category) // fallback to filter if no PDF
+    }
+  }}
+  className="capitalize"
+>
+  {category}
+</Button>
+
                   ))}
                 </div>
 
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredKnowledge.map((article) => (
-                    <Card key={article.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                      <CardContent className="p-6">
+                  <Card
+                  key={article.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => window.open(article.pdf, "_blank")}
+                  >
+                <CardContent className="p-6">
                         <div className="flex items-start justify-between mb-3">
                           <Badge variant="secondary" className="text-xs">
                             {article.category}
@@ -529,139 +489,6 @@ export default function HelpPage() {
                       </CardContent>
                     </Card>
                   </div>
-                </div>
-              </TabsContent>
-
-              {/* Resources Tab    //if you want the resource tab just remove the command line//
-              <TabsContent value="resources" className="space-y-8">
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Learning Resources</h2>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {resources.map((resource, index) => (
-                      <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
-                        <CardContent className="p-6 text-center">
-                          <div className="p-3 bg-primary/10 rounded-full w-fit mx-auto mb-4">
-                            <resource.icon className="h-8 w-8 text-primary" />
-                          </div>
-                          <h3 className="font-semibold mb-2">{resource.title}</h3>
-                          <p className="text-sm text-muted-foreground mb-3">{resource.description}</p>
-                          <Badge variant="secondary">{resource.count}</Badge>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Popular Guides</h2>
-                  <div className="space-y-4">
-                    {knowledgeBase
-                      .sort((a, b) => b.popularity - a.popularity)
-                      .slice(0, 5)
-                      .map((guide, index) => (
-                        <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <FileText className="h-5 w-5 text-primary" />
-                                <div>
-                                  <span className="font-medium">{guide.title}</span>
-                                  <p className="text-sm text-muted-foreground">{guide.content}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Badge variant="outline">{guide.readTime}</Badge>
-                                <div className="flex items-center text-xs text-muted-foreground">
-                                  <TrendingUp className="h-3 w-3 mr-1" />
-                                  {guide.popularity}%
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                  </div>
-                </div>
-              </TabsContent> */}
-
-              {/* Status Tab */}
-              <TabsContent value="status" className="space-y-8">
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">System Status</h2>
-
-                  {/* Overall Status */}
-                  <Card className="mb-6">
-                    <CardContent className="p-6">
-                      <div className="flex items-center space-x-3 mb-4">
-                        {getStatusIcon(systemStatus.overall)}
-                        <div>
-                          <h3 className="font-semibold text-green-700 capitalize">
-                            All Systems {systemStatus.overall}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">All services are running normally</p>
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Last updated: {systemStatus.lastUpdated.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Service Status */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Service Status</h3>
-                    {systemStatus.services.map((service, index) => (
-                      <Card key={index}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              {getStatusIcon(service.status)}
-                              <div>
-                                <span className="font-medium">{service.name}</span>
-                                <div className="flex items-center space-x-4 text-xs text-muted-foreground mt-1">
-                                  <span>Uptime: {service.uptime}</span>
-                                  <span>Response: {service.responseTime}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <Badge variant="secondary" className={getStatusColor(service.status)}>
-                              {service.status}
-                            </Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-
-                  {/* Recent Incidents
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Recent Incidents</h3>
-                    {systemStatus.incidents.map((incident) => (
-                      <Card key={incident.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h4 className="font-medium mb-1">{incident.title}</h4>
-                              <p className="text-sm text-muted-foreground mb-2">{incident.description}</p>
-                              <div className="text-xs text-muted-foreground">
-                                {incident.date.toLocaleDateString()} at {incident.date.toLocaleTimeString()}
-                              </div>
-                            </div>
-                            <Badge
-                              variant="secondary"
-                              className={
-                                incident.status === "resolved" || incident.status === "completed"
-                                  ? "text-green-700 bg-green-100"
-                                  : "text-yellow-700 bg-yellow-100"
-                              }
-                            >
-                              {incident.status}
-                            </Badge>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div> */}
                 </div>
               </TabsContent>
             </Tabs>

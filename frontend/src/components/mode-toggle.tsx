@@ -1,6 +1,6 @@
 "use client"
 
-// import * as React from "react" // Not needed with new JSX transform
+import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 // --- IMPORTANT: We import useTheme from the library, not a custom context ---
 import { useTheme } from "next-themes"
@@ -26,15 +26,44 @@ export function ModeToggle() {
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="center"
+        side="bottom"
+        className=""
+        sideOffset={5}
+        style={{
+          pointerEvents: 'auto',
+          position: 'fixed',
+          zIndex: 99999,
+          top: '70px',
+          left: '1590px',
+          backgroundColor: 'var(--background)',
+          border: '1px solid var(--border)',
+          borderRadius: '6px',
+          padding: '4px 0',
+          minWidth: '120px'
+        }}
+      >
         {/* The onClick handlers now call the library's setTheme function */}
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem
+          onClick={() => setTheme("light")}
+          className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          style={{ pointerEvents: 'auto' }}
+        >
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem
+          onClick={() => setTheme("dark")}
+          className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          style={{ pointerEvents: 'auto' }}
+        >
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem
+          onClick={() => setTheme("system")}
+          className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          style={{ pointerEvents: 'auto' }}
+        >
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

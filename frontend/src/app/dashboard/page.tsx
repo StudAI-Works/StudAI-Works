@@ -11,6 +11,8 @@ import { Plus, Search, MoreHorizontal, Edit, Trash2, Copy, Clock, Folder, Refres
 import { Header } from "@/components/header";
 import { Sidebar } from "@/components/dashboard-sidebar";
 import { useAuth } from "../context/authContext";
+import { ChatWidget } from "@/components/chat-widget";
+import axios from "axios";
 // import { HistoryPanel } from "@/components/HistoryPanel";
 
 type ProjectItem = {
@@ -46,25 +48,27 @@ export default function DashboardPage() {
     return <Navigate to="/auth" replace />;
   }
 
+  // import axios from "axios";
+
   const fetchProjects = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE_URL}/api/projects`, {
+      const res = await axios.get<ProjectItem[]>(`${BASE_URL}/api/projects`, {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: ProjectItem[] = await res.json();
-      setProjects(Array.isArray(data) ? data : []);
+
+      setProjects(Array.isArray(res.data) ? res.data : []);
     } catch (e: any) {
-      setError(e.message || 'Failed to load projects');
+      setError(e.response?.data?.message || e.message || "Failed to load projects");
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     if (token || !REQUIRE_AUTH_FLAG_FOR_CLIENT_SIDE()) {
@@ -106,6 +110,8 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header user={headerUser} onLogout={logout} />
+      <ChatWidget />
+
 
       <div className="flex">
         <Sidebar />
@@ -195,7 +201,7 @@ export default function DashboardPage() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery ? "Try adjusting your search terms" : "Create your first project to get started"}
                 </p>
-                <Link to="/editorpage">
+                <Link to="/generate">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Create New Project

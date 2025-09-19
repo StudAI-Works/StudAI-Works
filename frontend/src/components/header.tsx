@@ -42,27 +42,17 @@ export function Header({ user, onLogout }: HeaderProps) {
             <nav className="hidden md:flex items-center space-x-6">
               <Link
                 to="/generate"
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === "/generate" ? "text-primary" : "text-muted-foreground"
-                }`}
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/generate" ? "text-primary" : "text-muted-foreground"
+                  }`}
               >
                 Generate
               </Link>
               <Link
                 to="/dashboard"
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === "/dashboard" ? "text-primary" : "text-muted-foreground"
-                }`}
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/dashboard" ? "text-primary" : "text-muted-foreground"
+                  }`}
               >
                 Projects
-              </Link>
-              <Link
-                to="/organization"
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  pathname === "/organization" ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                Organization
               </Link>
             </nav>
           )}
@@ -74,21 +64,44 @@ export function Header({ user, onLogout }: HeaderProps) {
               {/* Deploy Button */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  {/* <Button variant="outline" size="sm">
                     <Rocket className="mr-2 h-4 w-4" />
                     Deploy
-                  </Button>
+                  </Button> */}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
+                <DropdownMenuContent
+                  align="end"
+                  className="z-[99999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg min-w-[200px]"
+                  sideOffset={5}
+                  style={{
+                    pointerEvents: 'auto',
+                    position: 'fixed',
+                    zIndex: 99999,
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '4px 0',
+                    minWidth: '200px'
+                  }}
+                >
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <Cloud className="mr-2 h-4 w-4" />
                     Deploy to Vercel
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <Cloud className="mr-2 h-4 w-4" />
                     Deploy to Netlify
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <Database className="mr-2 h-4 w-4" />
                     Deploy to Railway
                   </DropdownMenuItem>
@@ -98,31 +111,57 @@ export function Header({ user, onLogout }: HeaderProps) {
               {/* Connect Database */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  {/* <Button variant="outline" size="sm">
                     <Database className="mr-2 h-4 w-4" />
                     Connect
-                  </Button>
+                  </Button> */}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
+                <DropdownMenuContent
+                  align="end"
+                  className="z-[99999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg min-w-[200px]"
+                  sideOffset={5}
+                  style={{
+                    pointerEvents: 'auto',
+                    position: 'fixed',
+                    zIndex: 99999,
+                    backgroundColor: 'var(--background)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '4px 0',
+                    minWidth: '200px'
+                  }}
+                >
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <div className="flex items-center">
                       <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
                       Connect to Supabase
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <div className="flex items-center">
                       <div className="w-4 h-4 bg-orange-500 rounded mr-2"></div>
                       Connect to Firebase
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <div className="flex items-center">
                       <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
                       Connect to Neon
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <div className="flex items-center">
                       <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
                       Connect to Upstash
@@ -147,7 +186,23 @@ export function Header({ user, onLogout }: HeaderProps) {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuContent
+                // className="w-56  bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg"/\
+                align="end"
+                sideOffset={5}
+                style={{
+                  pointerEvents: 'auto',
+                  position: 'absolute',
+                  top: '70px',
+                  left: '1510px',   
+                  backgroundColor: 'var(--background)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '4px 0',
+                  minWidth: '200px'
+                }}
+
+              >
                 <div className="flex items-center justify-start gap-2 p-2">
                   <div className="flex flex-col space-y-1 leading-none">
                     <p className="font-medium">{user.name}</p>
@@ -155,19 +210,29 @@ export function Header({ user, onLogout }: HeaderProps) {
                   </div>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
+                <DropdownMenuItem
+                  asChild
+                  className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                  style={{ pointerEvents: 'auto' }}
+                >
                   <Link to="/account">
                     <User className="mr-2 h-4 w-4" />
                     Account
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                  style={{ pointerEvents: 'auto' }}
+                >
                   <CreditCard className="mr-2 h-4 w-4" />
                   Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {/* --- 3. ATTACH onLogout TO THE CLICK EVENT --- */}
-                <DropdownMenuItem onClick={onLogout} className="cursor-pointer">
+                <DropdownMenuItem
+                  onClick={onLogout}
+                  className="cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                  style={{ pointerEvents: 'auto' }}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>
