@@ -28,13 +28,16 @@ const resolveUserId = async (req: Request & { user?: { id: string } }): Promise<
 
 export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, res: Response) => {
     try {
+
         const REQUIRE_AUTH_PROJECTS = isAuthProjectsRequired()
         const authHeader = (req.headers?.authorization || '')
         const userToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : undefined
         const db = getDbClient(userToken)
 
+        console.log(req.body.user.id)
+
         const headerUserId = await resolveUserId(req as any)
-        const tokenUserId = req.user?.id || headerUserId
+        const tokenUserId = req?.body?.user?.id || headerUserId
 
         let ownerUserId: string | undefined = tokenUserId
         if (REQUIRE_AUTH_PROJECTS && !ownerUserId) {
@@ -44,6 +47,7 @@ export const saveGeneratedOutput = async (req: AuthenticatedRequest & Request, r
         if (!ownerUserId && !REQUIRE_AUTH_PROJECTS && process.env.DEV_FALLBACK_USER_ID) {
             ownerUserId = process.env.DEV_FALLBACK_USER_ID
         }
+        console.log(ownerUserId)
         if (!ownerUserId) {
             res.status(400).json({ error: 'Owner user id is required. Sign in or set DEV_FALLBACK_USER_ID to an existing user id.' })
             return
@@ -391,6 +395,8 @@ export const editProject = async (req: AuthenticatedRequest & Request, res: Resp
             res.status(401).json({ error: 'Unauthorized' })
             return
         }
+        console.log(projectId)
+
         if (!projectId) {
             res.status(400).json({ error: 'project id is required' })
             return

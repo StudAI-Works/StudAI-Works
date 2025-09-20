@@ -6,7 +6,11 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 // Utility function to concatenate class names
 function cn(...classes: (string | undefined | false | null)[]) {
   return classes.filter(Boolean).join(' ');
+
+
 }
+import { useAuth } from "../context/authContext";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,16 +25,16 @@ import { Header } from "@/components/header";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { useAuth } from "../context/authContext";
+// import { useAuth } from "../context/authContext";
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor,useSandpack,useSandpackConsole  } from "@codesandbox/sandpack-react";
+import { SandpackProvider, SandpackLayout, SandpackPreview, SandpackCodeEditor, useSandpack, useSandpackConsole } from "@codesandbox/sandpack-react";
 import type { SandpackFiles } from "@codesandbox/sandpack-react";
 import Editor from "@monaco-editor/react";
 import { historyService } from '@/services/historyService';
 import { ChatWidget } from "@/components/chat-widget";
 
-
+console.log(useAuth)
 
 // Interfaces
 interface Message {
@@ -886,7 +890,7 @@ export default fallbackFunction;`;
     const title = rawTitle !== null ? decodeURIComponent(rawTitle) : null;
 
     console.log(title)
-    if(title) setProjectTitle(title);
+    if (title) setProjectTitle(title);
     if (!pid) return;
     (async () => {
       try {
@@ -1044,29 +1048,41 @@ export default fallbackFunction;`;
     }
   };
 
+  console.log(user)
+  // import axios from "axios";
+
   const saveProjectIfNeeded = async (): Promise<string | null> => {
     try {
       if (!fullMarkdown) return projectId;
-      const targetId = projectId || 'new';
-            if(!projectTitle || projectTitle==="Untitled Project") {
-        const pt=prompt("Please provide a title for your project", projectTitle);
-        if(!pt) return null;
+
+      const targetId = projectId || "new";
+
+      if (!projectTitle || projectTitle === "Untitled Project") {
+        const pt = prompt("Please provide a title for your project", projectTitle);
+        if (!pt) return null;
         setProjectTitle(pt);
       }
-      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ markdown: fullMarkdown, title: projectTitle})
-      });
-      if (res.status === 404 && targetId !== 'new') {
-        res = await fetch(`${BASE_URL}/api/projects/new/save`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ markdown: fullMarkdown, title: projectTitle })
-        });
+
+      let res = await axios.post(
+        `${BASE_URL}/api/projects/${targetId}/save`,
+        { markdown: fullMarkdown, title: projectTitle },
+        { headers: getAuthHeaders() }
+      );
+
+      // let a = useAuth
+
+      if (res.status === 404 && targetId !== "new") {
+        console.log(useAuth)
+        res = await axios.post(
+          `${BASE_URL}/api/projects/new/save`,
+          { markdown: fullMarkdown, title: projectTitle, user: user?.id },
+          { headers: getAuthHeaders() }
+        );
       }
-      if (!res.ok) return projectId;
-      const data = await res.json();
+
+      if (res.status < 200 || res.status >= 300) return projectId;
+
+      const data = res.data;
       if (data.project_id) {
         setProjectId(data.project_id);
         if (user?.id) {
@@ -1074,11 +1090,13 @@ export default fallbackFunction;`;
         }
         return data.project_id as string;
       }
+
       return projectId;
     } catch {
       return projectId;
     }
-  }
+  };
+
 
   const classifyIntent = (text: string): 'edit' | 'fix' => {
     const hasErrorWords = /(error|exception|traceback|stack|typeerror|referenceerror|cannot\s+read|undefined|failed|crash|stack trace)/i.test(text);
@@ -1089,7 +1107,7 @@ export default fallbackFunction;`;
   const applyEditFromChat = async (messageContent: string) => {
     if (!projectId) {
       const saved = await saveProjectIfNeeded();
-      if (!saved) throw new Error('Project must be saved before applying edits');
+      if (!saved) toast.error('Project must be saved before applying edits');
     }
     const intent = classifyIntent(messageContent);
     const tId = toast.loading(intent === 'fix' ? 'Fixing error…' : 'Applying edit…');
@@ -1103,15 +1121,15 @@ export default fallbackFunction;`;
       const data = await res.json();
       // console.log('Edit response', data);
       const arts = (data.artifacts || []) as Array<{ path: string; content: string }>;
-      let summary=intent === 'fix' ? 'Applied fix to your reported error.' : 'Applied the requested edits.';
+      let summary = intent === 'fix' ? 'Applied fix to your reported error.' : 'Applied the requested edits.';
       if (arts.length > 0) {
         const files = arts.map(a => ({ path: a.path, content: a.content })) as GeneratedFile[];
         const summaryFiles = files.filter(f => f.path.trim().toLowerCase() === "summary.md");
         if (summaryFiles.length > 0) {
-        summary = summaryFiles[0].content;
+          summary = summaryFiles[0].content;
         }
         const filesWithoutSummary = files.filter(f => f.path.trim().toLowerCase() !== "summary.md");
-        console.log("Applying files", filesWithoutSummary); 
+        console.log("Applying files", filesWithoutSummary);
         setGeneratedFiles(filesWithoutSummary);
         setSandpackKey(Date.now());
         setFileTree(buildFileTree(filesWithoutSummary));
@@ -1126,7 +1144,9 @@ export default fallbackFunction;`;
     }
   }
 
-    const handleSend = async (prompt?: string) => {
+  const handleSend = async (prompt?: string) => {
+
+
     const messageContent = prompt || input;
 
 
@@ -1157,10 +1177,10 @@ export default fallbackFunction;`;
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'assistant', content: data.reply, timestamp: new Date() }]);
-      toast.update(loadingToastId, { render: "Response received!", type: "success", isLoading: false, autoClose: 2000 });
+      toast.update(loadingToastId, { render: "Response received! click generate code button to start building", type: "success", isLoading: false, autoClose: 5000 });
     } catch (err: any) {
       setMessages(prev => [...prev, { id: Date.now().toString(), type: 'error', content: `Error: ${err.message}`, timestamp: new Date() }]);
-      toast.update(loadingToastId, { render: `Error: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
+      toast.update(loadingToastId, { render: `Error: Save the project and try again`, type: "info", isLoading: false, autoClose: 4000 });
     }
   };
 
@@ -1240,46 +1260,48 @@ export default fallbackFunction;`;
     }
   };
 
-const handleSaveProject = async () => {
-  if (!fullMarkdown) {
-    toast.error("Nothing to save yet");
-    return;
-  }
-  console.log('Saving project', projectId, projectTitle);
+  const handleSaveProject = async () => {
+    if (!fullMarkdown) {
+      toast.error("Nothing to save yet");
+      return;
+    }
+    console.log('Saving project', projectId, projectTitle);
     // If no valid title, prompt the user to enter one
     if (!projectTitle || projectTitle === "Untitled Project" || !projectTitle.trim()) {
-    setShowProjectModal(true);
-    setError("Please enter a project name");
-    return;
-  }
-  setError(null);
+      setShowProjectModal(true);
+      setError("Please enter a project name");
+      return;
+    }
+    setError(null);
 
-  const loadingToastId = toast.loading("Saving project...");
-  try {
-    const targetId = projectId || 'new';
-    console.log('Saving to project ID:', targetId,projectTitle);
-    let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ markdown: fullMarkdown, title: projectTitle })
-    });
-    const targetUrl = `/generate?project=${targetId}&title=${encodeURIComponent(projectTitle)}`;
-    if ((location.pathname + location.search) !== targetUrl) {
-    navigate(targetUrl);
-    }
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const data = await res.json();
-    if (data.project_id) {
-      setProjectId(data.project_id);
-      if (user?.id) {
-        localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
+    const loadingToastId = toast.loading("Saving project...");
+    try {
+      const targetId = projectId || 'new';
+      console.log('Saving to project ID:', targetId, projectTitle);
+      console.log(user)
+      let res = await fetch(`${BASE_URL}/api/projects/${targetId}/save`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ markdown: fullMarkdown, title: projectTitle, user: user })
+      });
+      const targetUrl = `/generate?project=${targetId}&title=${encodeURIComponent(projectTitle)}`;
+      if ((location.pathname + location.search) !== targetUrl) {
+        navigate(targetUrl);
       }
+      if (!res.ok) toast.info("Try saving use Save project button")
+      const data = await res.json();
+      if (data.project_id) {
+        setProjectId(data.project_id);
+        if (user?.id) {
+          localStorage.setItem(`StudAI:lastProjectId:${user.id}`, data.project_id);
+        }
+      }
+      toast.update(loadingToastId, { render: `Saved! Project ${data.project_id}, v${data.version}`, type: "success", isLoading: false, autoClose: 3000 });
+    } catch (err) {
+      const errorMessage = typeof err === "object" && err !== null && "message" in err ? (err as any).message : String(err);
+      toast.update(loadingToastId, { render: `Save failed: ${errorMessage}`, type: "error", isLoading: false, autoClose: 4000 });
     }
-    toast.update(loadingToastId, { render: `Saved! Project ${data.project_id}, v${data.version}`, type: "success", isLoading: false, autoClose: 3000 });
-  } catch (err) {
-    toast.update(loadingToastId, { render: `Save failed: ${err.message}`, type: "error", isLoading: false, autoClose: 4000 });
-  }
-};
+  };
 
   const projectModal = (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -1298,18 +1320,18 @@ const handleSaveProject = async () => {
             Cancel
           </Button>
           <Button
-  onClick={() => {
-    if (!projectTitle.trim()) {
-      setError("Please enter a project name");
-      return;
-    }
-    setShowProjectModal(false);
-    setError(null);
-    handleSaveProject();  
-  }}
->
-  Save
-</Button>
+            onClick={() => {
+              if (!projectTitle.trim()) {
+                setError("Please enter a project name");
+                return;
+              }
+              setShowProjectModal(false);
+              setError(null);
+              handleSaveProject();
+            }}
+          >
+            Save
+          </Button>
         </div>
       </div>
     </div>
@@ -1584,9 +1606,9 @@ const handleSaveProject = async () => {
           <ResizablePanelGroup direction="horizontal" className="h-full w-full">
             {/* ---------- Left Panel (AI Assistant) ---------- */}
             <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-              <div className="h-screen flex flex-col ">
+              <div className="h-[99%] flex flex-col">
                 {/* Header */}
-                <div className="border-b p-4 flex-shrink-0 mt-14">
+                <div className="border-b p-4 flex-shrink-0">
                   <h2 className="font-semibold flex items-center">
                     <Sparkles className="mr-2 h-5 w-5 text-primary" /> AI Assistant
                   </h2>
@@ -1638,10 +1660,10 @@ const handleSaveProject = async () => {
                           ) : (
                             <>
                               <div className="whitespace-pre-wrap">
-                          <ReactMarkdown  remarkPlugins={[remarkGfm]}>
-                            {message.content}
-                          </ReactMarkdown>
-                          </div>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {message.content}
+                                </ReactMarkdown>
+                              </div>
                               <div className="text-xs opacity-70 mt-2">
                                 {new Date(message.timestamp).toLocaleTimeString()}
                               </div>

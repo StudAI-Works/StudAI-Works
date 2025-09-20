@@ -21,7 +21,7 @@ import { ChatWidget } from "@/components/chat-widget"
 import axios from "axios"
 // import { response } from "express"
 
-const API_URL = "https://studai-builder-backend.ambitiousriver-27aa23ca.southindia.azurecontainerapps.io";
+const API_URL = "http://localhost:8080";
 
 
 

@@ -47,7 +47,7 @@ export default function LandingPage() {
                 Start Building <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <a href="/Demo_video.mp4" target="_blank" rel="noopener noreferrer">
+            <a href="/StudAI New Demo (online-video-cutter.com) (online-video-cutter.com).mp4" target="_blank" rel="noopener noreferrer">
             <Button variant="outline" size="lg" className="text-lg px-8 py-6 bg-transparent">
             Watch Demo
             </Button>

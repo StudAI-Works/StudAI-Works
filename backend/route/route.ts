@@ -167,12 +167,12 @@ router.get("/api/config", (_req: Request, res: Response): void => {
 });
 
 // Project routes
-router.post("/api/projects/:id/save", maybeProtectProjects, saveGeneratedOutput);
-router.post("/api/projects/:id/edit", maybeProtectProjects, editProject);
+router.post("/api/projects/:id/save", saveGeneratedOutput);
+router.post("/api/projects/:id/edit", editProject);
 router.get("/api/projects", listProjects);
-router.get("/api/projects/:id", maybeProtectProjects, getProjectDetail);
-router.delete("/api/projects/:id", maybeProtectProjects, deleteProject);
-router.post("/api/projects", maybeProtectProjects, createBlankProject);
+router.get("/api/projects/:id", getProjectDetail);
+router.delete("/api/projects/:id", deleteProject);
+router.post("/api/projects", createBlankProject);
 
 
 const client = new OpenAI({
